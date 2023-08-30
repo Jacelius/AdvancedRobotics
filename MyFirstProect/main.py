@@ -20,23 +20,27 @@ right_motor = Motor(Port.D)
 robot = DriveBase(left_motor, right_motor, wheel_diameter=56, axle_track=90)
 
 # Constants
-forward_distance = 900  
-left_distance = 450
+forward_distance = 100.62
 
 # Move forward
-robot.straight(forward_distance)
+# robot.straight(forward_distance)
+
+robot.turn(-30)
+
+robot.straight(forward_distance*10)
+
+
+# robot.turn(-180)
 
 # Turn left
-left_motor.run_angle(500, -180) 
-right_motor.run_angle(500, 180)  
 robot.stop()
 
 # Move left
-robot.straight(left_distance)
+# robot.straight(left_distance)
 
 
-left_motor.run_angle(500, 90) 
-right_motor.run_angle(500, -90) 
+# left_motor.run_angle(500, 90) 
+# right_motor.run_angle(500, -90) 
 robot.stop()
 
 # End of program
