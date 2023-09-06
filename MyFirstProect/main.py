@@ -1,4 +1,6 @@
 #!/usr/bin/env pybricks-micropython
+import random
+import time
 from pybricks.hubs import EV3Brick
 from pybricks.ev3devices import (Motor, TouchSensor, ColorSensor,
                                  InfraredSensor, UltrasonicSensor, GyroSensor)
@@ -18,15 +20,18 @@ def target1():
     robot.straight(forward_distance*10)
     robot.turn(-140)
 
+
 def target1Reverse():
     forward_distance = 100.52
     robot.turn(140)
     robot.straight(-(forward_distance*10))
     robot.turn(26.57)
 
+
 def target2():
     forward_distance = 107
     robot.straight(forward_distance*10)
+
 
 def target2Reverse():
     forward_distance = 107
@@ -39,10 +44,12 @@ def target3():
     robot.turn(90)
     robot.straight(45*10)
 
+
 def target3Reverse():
     robot.straight(-(45*10))
     robot.turn(-90)
     robot.straight(-(100*10))
+
 
 def flexprogram():
     target1()
@@ -52,23 +59,34 @@ def flexprogram():
     target3()
     target3Reverse()
 
-def pause():
-    robot.drive(0,0)
 
-def maze():
-    while True:
-        if isCorner():
-            if should_turn_left():
-                robot.turn(-5)
-            if should_turn_right():
-                robot.turn(5)
-            brick.sound.beep()
+def pause():
+    robot.drive(0, 0)
+
+
+def maze(instructionset):
+    while len(instructionset) > 0:
+        if shouldCorrect():
+            corrections = 0
+            while shouldCorrect():
+                correctRobot()
+                corrections += 1
+                if corrections > 5:
+                    robot.straight(70)
+                    instructionset[0]()
+                    instructionset.pop(0)
+
         elif isIntersection():
-            # pause()
-            brick.sound.beep()
-            straight()
+            while isIntersection():
+                straight()
+            robot.straight(10)
+            instructionset[0]()
+            instructionset.pop(0)
         else:
             straight()
+
+    brick.sound.beep()
+
 
 def isIntersection():
     if left_light.reflection() < 15 and right_light.reflection() < 15:
@@ -76,35 +94,52 @@ def isIntersection():
     else:
         return False
 
-def isCorner():
+
+def shouldCorrect():
     if (left_light.reflection() < 15 and right_light.reflection() > 15) or (right_light.reflection() < 15 and left_light.reflection() > 15):
         return True
     else:
         return False
+
+
+def correctRobot():
+    if should_turn_left():
+        robot.turn(-5)
+    if should_turn_right():
+        robot.turn(5)
+
+
+def isCorner():
+    pass
+
 
 def should_turn_left():
     if left_light.reflection() < 15:
         return True
     else:
         return False
-    
+
+
 def should_turn_right():
     if right_light.reflection() < 15:
         return True
     else:
         return False
 
+
 def straight():
     robot.drive(100, 0)
 
+
 def turn_right():
-    robot.turn(90)
+    robot.turn(75)
     straight()
 
 
 def turn_left():
-    robot.turn(-90)        
+    robot.turn(-75)
     straight()
+
 
 # Initialize motors
 left_motor = Motor(Port.A)
@@ -122,20 +157,16 @@ robot = DriveBase(left_motor, right_motor, wheel_diameter=56, axle_track=90)
 # Move forward
 # robot.straight(forward_distance)
 
-#flexprogram()
-#lightsensorRun()
-#target1()
-#target2()
+# flexprogram()
+# lightsensorRun()
+# target1()
+# target2()
 # target3()
 
-maze()
+instructions = [turn_right, turn_left, turn_left,
+                straight, turn_right, turn_right, straight, straight, turn_right, straight, turn_right]
 
+maze(instructions)
 
-##use the speaker too beep  
-#
 
 robot.stop()
-
-
-
-
