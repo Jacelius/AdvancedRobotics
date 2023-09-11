@@ -1,6 +1,7 @@
 man_coords = (1, 1)
 goal_coords = []
 diamond_coords = []
+wall_coords = []
 
 def read_input(input_string):
     global man_coords
@@ -19,6 +20,8 @@ def read_input(input_string):
             man_coords = (i, row.index('@'))
 
         for j in range(len(row)):
+            if row[j] == 'X':
+                wall_coords.append((i, j))
             if row[j] == '.':
                 goal_coords.append((i, j))
             if row[j] == '$':
@@ -48,10 +51,18 @@ def read_input_from_terminal():
     input_string = "\n".join(input_lines)
     return input_string
 
+def print_grid(grid):
+    for row in grid:
+        print("".join(row))
+
+def update_grid():
+    pass
 
 input_string = read_input_from_terminal()
-result = read_input(input_string)
+grid = read_input(input_string)
 
 print("man coords", man_coords)
 print("goal coords", goal_coords)
 print("diamond coords", diamond_coords)
+print_grid(grid)
+
