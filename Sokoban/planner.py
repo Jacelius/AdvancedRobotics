@@ -1,5 +1,6 @@
 import threading
 import sys
+sys.setrecursionlimit(100000)
 wall_coords = []
 goal_coords = []
 statelist = []
@@ -99,8 +100,12 @@ def is_valid_new_state(proposed_state):
         if is_corner(coord):
             if coord not in goal_coords:
                 return False # avoid pushing diamond into corner
+            print("found a goal in a corner")
             return True # unless it is a goal
-    if man_coords not in wall_coords and diamond_coords not in wall_coords: 
+    if man_coords not in wall_coords: 
+        for coord in diamond_coords:
+            if coord in wall_coords:
+                return False
         return True
     else: 
         return False
@@ -120,6 +125,8 @@ def is_corner(coord):
         return False
 
 def is_goal_state(state, goal_coords): # state = (man_coords, diamond_coords)
+    if len(goal_coords) == 1:
+        return state[1][0] == goal_coords[0]
     return state[1] == goal_coords
 
 def get_next_state(state, direction):
@@ -142,19 +149,22 @@ def get_next_state(state, direction):
         new_man_coords = (state[0][0] - 1, state[0][1])
         if new_man_coords in diamond_coords:
             diamond_index = diamond_coords.index(new_man_coords)
-            new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][1] - 1, new_diamond_coords[diamond_index][1])
+            new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0] - 1, new_diamond_coords[diamond_index][1])
         return (new_man_coords, new_diamond_coords)
     elif (direction == "right"):
         new_man_coords = (state[0][0] + 1, state[0][1])
         if new_man_coords in diamond_coords:
             diamond_index = diamond_coords.index(new_man_coords)
-            new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][1] + 1, new_diamond_coords[diamond_index][1])
+            new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0] + 1, new_diamond_coords[diamond_index][1])
         return (new_man_coords, new_diamond_coords)
 
 def main():
     print("started reading")
     input_str = read_input_from_terminal()
     _, man_coords, diamond_coords = read_input(input_str)
+    print("goal_coords: ", goal_coords)
+    print("wall coords: ", wall_coords)
+    print("diamond coords: ", diamond_coords)
     previous_states = [] # (man_coords, diamond_coords)[]
     state = (man_coords, diamond_coords)
     search(state, previous_states)
@@ -166,7 +176,6 @@ def search(state, previous_states):
         print("Goal state reached!")
     else:
         #print("searching from ", state)
-        previous_states.append(state)
         left_state = get_next_state(state, "left")
         right_state = get_next_state(state, "right")
         up_state = get_next_state(state, "up")
@@ -180,15 +189,19 @@ def search(state, previous_states):
         if is_valid_new_state(left_state) and left_state not in previous_states:
             statelist.append(left_state)
         if is_valid_new_state(right_state) and right_state not in previous_states:
+            #print("valid right state", right_state)
             statelist.append(right_state)
         if is_valid_new_state(up_state) and up_state not in previous_states:
+            #print("valid up state", up_state)
             statelist.append(up_state)
         if is_valid_new_state(down_state) and down_state not in previous_states:
             statelist.append(down_state)
-
-        search(statelist.pop(0), previous_states)
+        previous_states.append(state)
+        try: 
+            search(statelist.pop(0), previous_states)
+        except IndexError:
+            print("No solution found!")
+            return
         
-        
-    
 if __name__ == "__main__":
     main()
