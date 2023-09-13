@@ -2,6 +2,7 @@ import threading
 import sys
 wall_coords = []
 goal_coords = []
+statelist = []
 
 def read_input(input_string):
     global wall_coords
@@ -160,6 +161,7 @@ def main():
         
 
 def search(state, previous_states):
+    global statelist
     if is_goal_state(state, goal_coords):
         print("Goal state reached!")
     else:
@@ -176,14 +178,17 @@ def search(state, previous_states):
         #print("up state: ", up_state)
         #print("down state: ", down_state)
         if is_valid_new_state(left_state) and left_state not in previous_states:
-            threading.Thread(target=search, args=(left_state, previous_states)).start()
-        elif is_valid_new_state(right_state) and right_state not in previous_states:
-            threading.Thread(target=search, args=(right_state, previous_states)).start()
-        elif is_valid_new_state(up_state) and up_state not in previous_states:
-            threading.Thread(target=search, args=(up_state, previous_states)).start()
-        elif is_valid_new_state(down_state) and down_state not in previous_states:
-            threading.Thread(target=search, args=(down_state, previous_states)).start()
-        else:
-            print("No solution found!", file=sys.stderr)
+            statelist.append(left_state)
+        if is_valid_new_state(right_state) and right_state not in previous_states:
+            statelist.append(right_state)
+        if is_valid_new_state(up_state) and up_state not in previous_states:
+            statelist.append(up_state)
+        if is_valid_new_state(down_state) and down_state not in previous_states:
+            statelist.append(down_state)
+
+        search(statelist.pop(0), previous_states)
+        
+        
     
-main()
+if __name__ == "__main__":
+    main()
