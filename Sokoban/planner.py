@@ -135,6 +135,30 @@ def get_next_state(state, direction):
             new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0] + 1, new_diamond_coords[diamond_index][1])
         return (new_man_coords, new_diamond_coords)
 
+def search(state, previous_states, grid, path):
+    global statelist
+    if is_goal_state(state, goal_coords):
+        return path + [state]  # Return the path along with the final state
+    else:
+        left_state = get_next_state(state, "left")
+        right_state = get_next_state(state, "right")
+        up_state = get_next_state(state, "up")
+        down_state = get_next_state(state, "down")
+
+        if is_valid_new_state(left_state) and left_state not in previous_states:
+            statelist.append(left_state)
+        if is_valid_new_state(right_state) and right_state not in previous_states:
+            statelist.append(right_state)
+        if is_valid_new_state(up_state) and up_state not in previous_states:
+            statelist.append(up_state)
+        if is_valid_new_state(down_state) and down_state not in previous_states:
+            statelist.append(down_state)
+        previous_states.append(state)
+        try:
+            return search(statelist.pop(0), previous_states, grid, path + [state])  # Pass path along with state
+        except IndexError:
+            return None  # No solution found
+
 def main():
     print("started reading")
     input_str = read_input_from_terminal()
@@ -142,43 +166,19 @@ def main():
     print("goal_coords: ", goal_coords)
     print("wall coords: ", wall_coords)
     print("diamond coords: ", diamond_coords)
-    previous_states = [] # (man_coords, diamond_coords)[]
+    previous_states = []  # (man_coords, diamond_coords)[]
     state = (man_coords, diamond_coords)
-    search(state, previous_states,grid)
-        
-
-def search(state, previous_states,grid):
-    global statelist
-    if is_goal_state(state, goal_coords):
-        print("Goal state reached!")
+    final_path = search(state, previous_states, grid, [])
+    if final_path:
+        print("Solution Found!")
+        print("The final state is:")
+        #print_grid(grid, final_path[-1][0])  # Print the final state
+        print("Path:")
+        print(f"Number of steps: {len(final_path) - 1}")
+        for step, state in enumerate(final_path[1:]):  # Skip the initial state
+            print(f"Step {step + 1}: Move {state[0]} to {state[1]}")
     else:
-        print_grid(grid, state)
-        left_state = get_next_state(state, "left")
-        right_state = get_next_state(state, "right")
-        up_state = get_next_state(state, "up")
-        down_state = get_next_state(state, "down")
-        # print states
-        #print()
-        #print("left state: ", left_state)
-        #print("right state: ", right_state)
-        #print("up state: ", up_state)
-        #print("down state: ", down_state)
-        if is_valid_new_state(left_state) and left_state not in previous_states:
-            statelist.append(left_state)
-        if is_valid_new_state(right_state) and right_state not in previous_states:
-            #print("valid right state", right_state)
-            statelist.append(right_state)
-        if is_valid_new_state(up_state) and up_state not in previous_states:
-            #print("valid up state", up_state)
-            statelist.append(up_state)
-        if is_valid_new_state(down_state) and down_state not in previous_states:
-            statelist.append(down_state)
-        previous_states.append(state)
-        try: 
-            search(statelist.pop(0), previous_states,grid)
-        except IndexError:
-            print("No solution found!")
-            return
-        
+        print("No solution found!")
+
 if __name__ == "__main__":
     main()
