@@ -1,12 +1,15 @@
-man_coords = (1, 1)
-goal_coords = []
-diamond_coords = []
+import threading
+import sys
+sys.setrecursionlimit(100000)
 wall_coords = []
+goal_coords = []
+statelist = []
 
 def read_input(input_string):
-    global man_coords
+    global wall_coords
     global goal_coords
-    global diamond_coords
+    man_coords = ()
+    diamond_coords = []
     # Split the input_string into lines
     lines = input_string.strip().split('\n')
 
@@ -17,21 +20,21 @@ def read_input(input_string):
     for i, line in enumerate(lines):
         row = list(line)
         if '@' in row:
-            man_coords = (i, row.index('@'))
+            man_coords = (row.index('@'), i)
 
         for j in range(len(row)):
             if row[j] == 'X':
-                wall_coords.append((i, j))
+                wall_coords.append((j, i))
             if row[j] == '.':
-                goal_coords.append((i, j))
+                goal_coords.append((j, i))
             if row[j] == '$':
-                diamond_coords.append((i, j))
+                diamond_coords.append((j, i))
             if row[j] == '*':
-                diamond_coords.append((i, j))
-                goal_coords.append((i, j))
+                diamond_coords.append((j, i))
+                goal_coords.append((j, i))
         grid.append(row)
 
-    return grid
+    return grid, man_coords, diamond_coords
 
 
 def read_input_from_terminal():
@@ -49,81 +52,133 @@ def read_input_from_terminal():
             break
 
     input_string = "\n".join(input_lines)
-    return input_string
+    return input_string    
 
-def add_defaults_to_map():
-    # restore goal_coords and diamond_coords
-    global grid, goal_coords, diamond_coords, man_coords
-    for coord in goal_coords:
-        row, col = coord
-        grid[row][col] = '.'
-    for coord in diamond_coords:
-        row, col = coord
-        grid[row][col] = '$'
-    grid[man_coords[0]][man_coords[1]] = '@'
+def replace_symbols_with_spaces(arr):
+    for i in range(len(arr)):
+        for j in range(len(arr[i])):
+            if arr[i][j] == '@' or arr[i][j] == '$':
+                arr[i][j] = ' '
     
 
-def print_grid():
-    global grid
-    add_defaults_to_map()
+def print_grid(grid,state):
+    replace_symbols_with_spaces(grid)
+    grid[state[0][1]][state[0][0]] = '@'
+    for coord in state[1]:
+        grid[coord[1]][coord[0]] = '$'
     for row in grid:
         print("".join(row))
     print("\n")
 
-def update_grid(action):
-    global man_coords, grid
-    if not is_valid_action(action):
-        print("Invalid action!!!", action)
-        return grid
-    coord, direction = action
-    row, col = coord
-    current_char = grid[row][col]
-    grid[row][col] = ' '
-    if direction == 'up':
-        row -= 1
-    elif direction == 'down':
-        row += 1
-    elif direction == 'left':
-        col -= 1
-    elif direction == 'right':
-        col += 1
-    grid[row][col] = current_char
-    print_grid()
-    return grid
 
-def is_valid_action(action):
-    global grid
-    coord, direction = action
-    row, col = coord
-    if direction == 'up':
-        row -= 1
-    elif direction == 'down':
-        row += 1
-    elif direction == 'left':
-        col -= 1
-    elif direction == 'right':
-        col += 1
-    if grid[row][col] == '$':
-        is_valid = is_valid_action(((row, col), direction))
-        if is_valid:
-            #update_grid(((row, col), direction))
-            return True
-        else:
-            return False
-            
-    if grid[row][col] == ' ' or grid[row][col] == '.':
+def is_valid_new_state(proposed_state):
+    man_coords, diamond_coords = proposed_state
+    for coord in diamond_coords: 
+        if is_corner(coord):
+            if coord not in goal_coords:
+                return False # avoid pushing diamond into corner
+            print("found a goal in a corner")
+            return True # unless it is a goal
+    if man_coords not in wall_coords: 
+        for coord in diamond_coords:
+            if coord in wall_coords:
+                return False
         return True
-    return False
-
-input_string = read_input_from_terminal()
-grid = read_input(input_string)
-
-print("man coords", man_coords)
-print("goal coords", goal_coords)
-print("diamond coords", diamond_coords)
-print_grid()
-update_grid((man_coords, 'right'))
-update_grid((man_coords, 'right'))
-update_grid((man_coords, 'down'))
+    else: 
+        return False
 
 
+def is_corner(coord):
+    row, col = coord
+    if (row, col+1) in wall_coords and (row+1, col) in wall_coords:
+        return True
+    elif (row, col-1) in wall_coords and (row+1, col) in wall_coords:
+        return True
+    elif (row, col+1) in wall_coords and (row-1, col) in wall_coords:
+        return True
+    elif (row, col-1) in wall_coords and (row-1, col) in wall_coords:
+        return True
+    else:
+        return False
+
+def is_goal_state(state, goal_coords): # state = (man_coords, diamond_coords)
+    if len(goal_coords) == 1:
+        return state[1][0] == goal_coords[0]
+    return state[1] == goal_coords
+
+def get_next_state(state, direction):
+    new_man_coords = ()
+    diamond_coords = state[1]
+    new_diamond_coords = diamond_coords.copy() # might not change
+    if (direction == "up"):
+        new_man_coords = (state[0][0], state[0][1] - 1)
+        if new_man_coords in diamond_coords: # we push a diamond
+            diamond_index = diamond_coords.index(new_man_coords)
+            new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0], new_diamond_coords[diamond_index][1] - 1)
+        return (new_man_coords, new_diamond_coords)
+    elif (direction == "down"):
+        new_man_coords = (state[0][0], state[0][1] + 1)
+        if new_man_coords in diamond_coords:
+            diamond_index = diamond_coords.index(new_man_coords)
+            new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0], new_diamond_coords[diamond_index][1] + 1)
+        return (new_man_coords, new_diamond_coords)
+    elif (direction == "left"):
+        new_man_coords = (state[0][0] - 1, state[0][1])
+        if new_man_coords in diamond_coords:
+            diamond_index = diamond_coords.index(new_man_coords)
+            new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0] - 1, new_diamond_coords[diamond_index][1])
+        return (new_man_coords, new_diamond_coords)
+    elif (direction == "right"):
+        new_man_coords = (state[0][0] + 1, state[0][1])
+        if new_man_coords in diamond_coords:
+            diamond_index = diamond_coords.index(new_man_coords)
+            new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0] + 1, new_diamond_coords[diamond_index][1])
+        return (new_man_coords, new_diamond_coords)
+
+def main():
+    print("started reading")
+    input_str = read_input_from_terminal()
+    grid, man_coords, diamond_coords = read_input(input_str)
+    print("goal_coords: ", goal_coords)
+    print("wall coords: ", wall_coords)
+    print("diamond coords: ", diamond_coords)
+    previous_states = [] # (man_coords, diamond_coords)[]
+    state = (man_coords, diamond_coords)
+    search(state, previous_states,grid)
+        
+
+def search(state, previous_states,grid):
+    global statelist
+    if is_goal_state(state, goal_coords):
+        print("Goal state reached!")
+    else:
+        print_grid(grid, state)
+        left_state = get_next_state(state, "left")
+        right_state = get_next_state(state, "right")
+        up_state = get_next_state(state, "up")
+        down_state = get_next_state(state, "down")
+        # print states
+        #print()
+        #print("left state: ", left_state)
+        #print("right state: ", right_state)
+        #print("up state: ", up_state)
+        #print("down state: ", down_state)
+        if is_valid_new_state(left_state) and left_state not in previous_states:
+            statelist.append(left_state)
+        if is_valid_new_state(right_state) and right_state not in previous_states:
+            #print("valid right state", right_state)
+            statelist.append(right_state)
+        if is_valid_new_state(up_state) and up_state not in previous_states:
+            #print("valid up state", up_state)
+            statelist.append(up_state)
+        if is_valid_new_state(down_state) and down_state not in previous_states:
+            statelist.append(down_state)
+        previous_states.append(state)
+        try: 
+            search(statelist.pop(0), previous_states,grid)
+        except IndexError:
+            print("No solution found!")
+            return
+        
+if __name__ == "__main__":
+    main()
