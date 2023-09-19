@@ -73,20 +73,21 @@ def print_grid(grid,state):
 
 def is_valid_new_state(proposed_state):
     man_coords, diamond_coords = proposed_state
+    result = None
     for coord in diamond_coords: 
         if is_corner(coord):
             if coord not in goal_coords:
-                return False # avoid pushing diamond into corner
-            print("found a goal in a corner")
-            return True # unless it is a goal
+                result = False # avoid pushing diamond into corner
+            #print("found a goal in a corner")
+            result = True # unless it is a goal
     if man_coords not in wall_coords: 
         for coord in diamond_coords:
             if coord in wall_coords:
-                return False
-        return True
+                result = False
+        result = True
     else: 
-        return False
-
+        result = False
+    return result
 
 def is_corner(coord):
     row, col = coord
@@ -194,11 +195,6 @@ def search(state,grid):
             elif solution[i][1] > solution[i+1][1]:
                 moves.append("up")
         print("Moves: ", moves)
-        
-
-
-
-        
     else:
         #print_grid(grid, state)
         left_state = get_next_state(state, "left")
