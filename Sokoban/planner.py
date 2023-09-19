@@ -72,7 +72,7 @@ def print_grid(grid,state):
 
 
 def is_valid_new_state(proposed_state):
-    man_coords, diamond_coords, _ = proposed_state
+    man_coords, diamond_coords = proposed_state
     for coord in diamond_coords: 
         if is_corner(coord):
             if coord not in goal_coords:
@@ -115,27 +115,30 @@ def get_next_state(state, direction):
         if new_man_coords in diamond_coords: # we push a diamond
             diamond_index = diamond_coords.index(new_man_coords)
             new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0], new_diamond_coords[diamond_index][1] - 1)
-        return (new_man_coords, new_diamond_coords,state)
+        return (new_man_coords, new_diamond_coords)
     elif (direction == "down"):
         new_man_coords = (state[0][0], state[0][1] + 1)
         if new_man_coords in diamond_coords:
             diamond_index = diamond_coords.index(new_man_coords)
             new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0], new_diamond_coords[diamond_index][1] + 1)
-        return (new_man_coords, new_diamond_coords,state)
+        return (new_man_coords, new_diamond_coords)
     elif (direction == "left"):
         new_man_coords = (state[0][0] - 1, state[0][1])
         if new_man_coords in diamond_coords:
             diamond_index = diamond_coords.index(new_man_coords)
             new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0] - 1, new_diamond_coords[diamond_index][1])
-        return (new_man_coords, new_diamond_coords,state)
+        return (new_man_coords, new_diamond_coords)
     elif (direction == "right"):
         new_man_coords = (state[0][0] + 1, state[0][1])
         if new_man_coords in diamond_coords:
             diamond_index = diamond_coords.index(new_man_coords)
             new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0] + 1, new_diamond_coords[diamond_index][1])
-        return (new_man_coords, new_diamond_coords,state)
+        return (new_man_coords, new_diamond_coords)
 
 def main():
+    global statelist
+    global statelist_copy
+    global all_search_sates
     print("started reading")
     input_str = read_input_from_terminal()
     grid, man_coords, diamond_coords = read_input(input_str)
@@ -143,25 +146,58 @@ def main():
     print("wall coords: ", wall_coords)
     print("diamond coords: ", diamond_coords)
     previous_states = [] # (man_coords, diamond_coords)[]
-    state = (man_coords, diamond_coords,None)
+    state = (man_coords, diamond_coords)
+    statelist.append(state)
+    statelist_copy.append(state)
+    all_search_sates.append(state)
     search(state,grid)
         
 previous_states = []
+all_search_sates = []
+statelist_copy = []
 
 def search(state,grid):
     global statelist
+    global all_search_sates
+    global statelist_copy
     global previous_states
+    this_states_index = statelist_copy.index(state)
     if is_goal_state(state, goal_coords):
         print("found a solution!")
         print_grid(grid, state)
-        #State is a triple of (man_coords, diamond_coords, parent_state)
-        #Extract all man cords
+        # We can find the current state in all_search_states by looking at the index of the current state in statelist_copy
+        # Then we can find the index of the parent state in all_search_states by looking at the second element of the tuple
+        # at the index of the current state in all_search_states
+        # We can repeat this process until we reach the initial state
+        #The solution should be a list of all the man cords in the solution
         solution = []
-        while state != None:
-            solution.append(state[0])
-            state = state[2]
+        solution.append(state[0])
+        current_state = state
+        while current_state != statelist_copy[0]:
+            parent_state_index = all_search_sates[statelist_copy.index(current_state)][1]
+            parent_state = statelist_copy[parent_state_index]
+            solution.append(parent_state[0])
+            current_state = parent_state
         solution.reverse()
-        print(solution)
+        print("Solution: ", solution)
+
+        #Translate the solution to a sequance of moves that can be used to solve the problem in the game
+        # The solution should be a list of strings that can be used to solve the problem in the game
+        moves = []
+        for i in range(len(solution)-1):
+            if solution[i][0] < solution[i+1][0]:
+                moves.append("right")
+            elif solution[i][0] > solution[i+1][0]:
+                moves.append("left")
+            elif solution[i][1] < solution[i+1][1]:
+                moves.append("down")
+            elif solution[i][1] > solution[i+1][1]:
+                moves.append("up")
+        print("Moves: ", moves)
+        
+
+
+
         
     else:
         #print_grid(grid, state)
@@ -171,14 +207,22 @@ def search(state,grid):
         down_state = get_next_state(state, "down")
         if is_valid_new_state(left_state) and left_state not in previous_states:
             statelist.append(left_state)
+            all_search_sates.append((left_state, this_states_index))
+            statelist_copy.append(left_state)
         if is_valid_new_state(right_state) and right_state not in previous_states:
             #print("valid right state", right_state)
             statelist.append(right_state)
+            all_search_sates.append((right_state, this_states_index))
+            statelist_copy.append(right_state)
         if is_valid_new_state(up_state) and up_state not in previous_states:
             #print("valid up state", up_state)
             statelist.append(up_state)
+            all_search_sates.append((up_state, this_states_index))
+            statelist_copy.append(up_state)
         if is_valid_new_state(down_state) and down_state not in previous_states:
             statelist.append(down_state)
+            all_search_sates.append((down_state, this_states_index))
+            statelist_copy.append(down_state)
         previous_states.append((state[0], state[1]))
         try: 
             search(statelist.pop(0),grid)
