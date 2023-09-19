@@ -72,7 +72,7 @@ def print_grid(grid,state):
 
 
 def is_valid_new_state(proposed_state):
-    man_coords, diamond_coords = proposed_state
+    man_coords, diamond_coords, _ = proposed_state
     for coord in diamond_coords: 
         if is_corner(coord):
             if coord not in goal_coords:
@@ -115,25 +115,25 @@ def get_next_state(state, direction):
         if new_man_coords in diamond_coords: # we push a diamond
             diamond_index = diamond_coords.index(new_man_coords)
             new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0], new_diamond_coords[diamond_index][1] - 1)
-        return (new_man_coords, new_diamond_coords)
+        return (new_man_coords, new_diamond_coords,state)
     elif (direction == "down"):
         new_man_coords = (state[0][0], state[0][1] + 1)
         if new_man_coords in diamond_coords:
             diamond_index = diamond_coords.index(new_man_coords)
             new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0], new_diamond_coords[diamond_index][1] + 1)
-        return (new_man_coords, new_diamond_coords)
+        return (new_man_coords, new_diamond_coords,state)
     elif (direction == "left"):
         new_man_coords = (state[0][0] - 1, state[0][1])
         if new_man_coords in diamond_coords:
             diamond_index = diamond_coords.index(new_man_coords)
             new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0] - 1, new_diamond_coords[diamond_index][1])
-        return (new_man_coords, new_diamond_coords)
+        return (new_man_coords, new_diamond_coords,state)
     elif (direction == "right"):
         new_man_coords = (state[0][0] + 1, state[0][1])
         if new_man_coords in diamond_coords:
             diamond_index = diamond_coords.index(new_man_coords)
             new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0] + 1, new_diamond_coords[diamond_index][1])
-        return (new_man_coords, new_diamond_coords)
+        return (new_man_coords, new_diamond_coords,state)
 
 def main():
     print("started reading")
@@ -143,26 +143,32 @@ def main():
     print("wall coords: ", wall_coords)
     print("diamond coords: ", diamond_coords)
     previous_states = [] # (man_coords, diamond_coords)[]
-    state = (man_coords, diamond_coords)
-    search(state, previous_states,grid)
+    state = (man_coords, diamond_coords,None)
+    search(state,grid)
         
+previous_states = []
 
-def search(state, previous_states,grid):
+def search(state,grid):
     global statelist
+    global previous_states
     if is_goal_state(state, goal_coords):
-        print("Goal state reached!")
-    else:
+        print("found a solution!")
         print_grid(grid, state)
+        #State is a triple of (man_coords, diamond_coords, parent_state)
+        #Extract all man cords
+        solution = []
+        while state != None:
+            solution.append(state[0])
+            state = state[2]
+        solution.reverse()
+        print(solution)
+        
+    else:
+        #print_grid(grid, state)
         left_state = get_next_state(state, "left")
         right_state = get_next_state(state, "right")
         up_state = get_next_state(state, "up")
         down_state = get_next_state(state, "down")
-        # print states
-        #print()
-        #print("left state: ", left_state)
-        #print("right state: ", right_state)
-        #print("up state: ", up_state)
-        #print("down state: ", down_state)
         if is_valid_new_state(left_state) and left_state not in previous_states:
             statelist.append(left_state)
         if is_valid_new_state(right_state) and right_state not in previous_states:
@@ -173,9 +179,9 @@ def search(state, previous_states,grid):
             statelist.append(up_state)
         if is_valid_new_state(down_state) and down_state not in previous_states:
             statelist.append(down_state)
-        previous_states.append(state)
+        previous_states.append((state[0], state[1]))
         try: 
-            search(statelist.pop(0), previous_states,grid)
+            search(statelist.pop(0),grid)
         except IndexError:
             print("No solution found!")
             return
