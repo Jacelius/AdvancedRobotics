@@ -135,7 +135,12 @@ def get_next_state(state, direction):
             new_diamond_coords[diamond_index] = (new_diamond_coords[diamond_index][0] + 1, new_diamond_coords[diamond_index][1])
         return (new_man_coords, new_diamond_coords)
 
+
+all_search_states = []
+
 def main():
+    global all_search_states
+    
     print("started reading")
     input_str = read_input_from_terminal()
     grid, man_coords, diamond_coords = read_input(input_str)
@@ -143,37 +148,51 @@ def main():
     print("wall coords: ", wall_coords)
     print("diamond coords: ", diamond_coords)
     previous_states = [] # (man_coords, diamond_coords)[]
-    state = (man_coords, diamond_coords)
-    search(state, previous_states,grid)
+    state = (man_coords, diamond_coords,0,0)
+    all_search_states.append(state)
+    search(state, previous_states,grid, None)
         
 
-def search(state, previous_states,grid):
+
+def search(state, previous_states,grid,previous_state):
     global statelist
+    global all_search_states
+    own_index = state[2]
+    man_cords = state[0]
+    parent_index = state[3]
+
+    #print_grid(grid, state)
     if is_goal_state(state, goal_coords):
         print("Goal state reached!")
-    else:
         print_grid(grid, state)
+    else:
+        nextindex = own_index 
         left_state = get_next_state(state, "left")
         right_state = get_next_state(state, "right")
         up_state = get_next_state(state, "up")
         down_state = get_next_state(state, "down")
-        # print states
-        #print()
-        #print("left state: ", left_state)
-        #print("right state: ", right_state)
-        #print("up state: ", up_state)
-        #print("down state: ", down_state)
         if is_valid_new_state(left_state) and left_state not in previous_states:
+            nextindex += 1
+            left_state = (left_state[0], left_state[1], nextindex, own_index)
             statelist.append(left_state)
+            all_search_states.append(left_state)
         if is_valid_new_state(right_state) and right_state not in previous_states:
             #print("valid right state", right_state)
+            nextindex += 1
+            right_state = (right_state[0], right_state[1], nextindex, own_index)
             statelist.append(right_state)
+            all_search_states.append(right_state)
         if is_valid_new_state(up_state) and up_state not in previous_states:
-            #print("valid up state", up_state)
+            nextindex += 1
+            up_state = (up_state[0], up_state[1], nextindex, own_index)
             statelist.append(up_state)
+            all_search_states.append(up_state)
         if is_valid_new_state(down_state) and down_state not in previous_states:
+            nextindex += 1
+            down_state = (down_state[0], down_state[1], nextindex, own_index)
             statelist.append(down_state)
-        previous_states.append(state)
+            all_search_states.append(down_state)
+        previous_states.append((state[0], state[1]))
         try: 
             search(statelist.pop(0), previous_states,grid)
         except IndexError:
