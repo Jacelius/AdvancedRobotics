@@ -77,8 +77,8 @@ def is_valid_new_state(proposed_state):
         if is_corner(coord):
             if coord not in goal_coords:
                 return False # avoid pushing diamond into corner
-            print("found a goal in a corner")
-            return True # unless it is a goal
+            #print("found a goal in a corner")
+            #Make sure man
     if man_coords not in wall_coords: 
         for coord in diamond_coords:
             if coord in wall_coords:
@@ -200,7 +200,7 @@ def search(state,grid):
 
         
     else:
-        #print_grid(grid, state)
+        print_grid(grid, state)
         left_state = get_next_state(state, "left")
         right_state = get_next_state(state, "right")
         up_state = get_next_state(state, "up")
