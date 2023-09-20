@@ -4,7 +4,8 @@ from pybricks.hubs import EV3Brick
 from pybricks.ev3devices import (Motor, ColorSensor,)
 from pybricks.parameters import Port
 from pybricks.robotics import DriveBase
-from pybricks import ev3brick as brick
+
+ev3 = EV3Brick()
 
 
 def maze_3_sensor(instruction_set):
@@ -19,13 +20,13 @@ def maze_3_sensor(instruction_set):
         else:
             straight()
 
-    brick.sound.beep()
+        ev3.speaker.beep()
 
 
 def execute_instruction(instruction):
     robot.straight(nudge_dist + 50)
     instruction()
-    brick.sound.beep()
+    ev3.speaker.beep()
 
 
 def is_intersection():

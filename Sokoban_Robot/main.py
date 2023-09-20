@@ -3,6 +3,7 @@ from pybricks.hubs import EV3Brick
 from pybricks.ev3devices import (Motor, TouchSensor, ColorSensor)
 from pybricks.parameters import Port, Stop, Direction, Button, Color
 # from pybricks.tools import wait, StopWatch, DataLog
+from pybricks.tools import wait
 from pybricks.robotics import DriveBase
 # from pybricks.media.ev3dev import SoundFile, ImageFile
 
@@ -13,62 +14,85 @@ right_motor = Motor(Port.A)
 left_motor = Motor(Port.D)
 
 # Initialize the lightsensors
-center_light = ColorSensor(Port.S2)
-right_light = ColorSensor(Port.S1)
-left_light = ColorSensor(Port.S4)
+center_sensor = ColorSensor(Port.S2)
+right_sensor = ColorSensor(Port.S4)
+left_sensor = ColorSensor(Port.S1)
 
 # Initialize the drivebase
-robot = DriveBase(left_motor, right_motor, wheel_diameter=56, axle_track=94)
+robot = DriveBase(left_motor, right_motor, wheel_diameter=56, axle_track=120)
 
 # Global variables
 SPEED = 100
-REFLECTION_RATE = 20
-TURN_RADIUS = 100
+REFLECTION_RATE = 10
+TURN_RADIUS = 95
 CORRECTION_ANGLE = 10
-INSTRUCTIONS = ["straight", "straight", "right", "right", "right", "right"]
+# Calculate the light threshold. Choose values based on your measurements.
+BLACK = 5
+WHITE = 100
+threshold = (BLACK + WHITE) / 2
+
+# Set the drive speed at 100 millimeters per second.
+DRIVE_SPEED = 100
+
+# Set the gain of the proportional line controller. This means that for every
+# percentage point of light deviating from the threshold, we set the turn
+# rate of the drivebase to 1.2 degrees per second.
+
+# For example, if the light value deviates from the threshold by 10, the robot
+# steers at 10*1.2 = 12 degrees per second.
+PROPORTIONAL_GAIN = 1.2
+INSTRUCTIONS = ["right", "straight", "turn_around_without_box",
+                "left", "left", "left", "straight", "straight"]
 
 # Write your program here.
 
 
 def run():
     while len(INSTRUCTIONS) > 0:
-        if is_on_center_line():
-            if is_intersection():
-                print("intersection \n")
-                run_instruction()
-            elif is_corner():
-                print("corner \n")
-                run_instruction()
-            else:
-                straight()
+        if is_intersection():
+            print("intersection")
+            run_instruction()
+        elif right_on_line():
+            print("right corner")
+            run_instruction()
+        elif left_on_line():
+            print("left corner")
+            run_instruction()
         else:
-            print("Correcting \n")
-            correct_robot()
-    print("Done \n")
+            go_straight()
 
 
-def warning_beep():
-    robot.stop()
-    ev3.speaker.beep(1, 500)
+def get_direction():
+    angle = robot.angle() % 360
+
+    if angle > 330 or angle < 30:
+        return "front"
+    elif angle > 60 and angle < 120:
+        return "right"
+    elif angle > 150 and angle < 210:
+        return "back"
+    elif angle > 240 and angle < 300:
+        return "left"
+    else:
+        return "Unknown angle: " + str(angle) + " degrees"
 
 
 def run_instruction():
-    def go_over_line():
-        robot.straight(60)
     instruction = INSTRUCTIONS.pop(0)
+
+    straight_distance = 0
+    if len(INSTRUCTIONS) > 0:
+        straight_distance = 80
+
+    print("Instruction: " + instruction)
     if instruction == "straight":
-        print("straight \n")
-        go_over_line()
-        straight()
-        robot.straight(20)
+        robot.straight(straight_distance)
     elif instruction == "right":
-        print("right \n")
-        go_over_line()
+        robot.straight(straight_distance)
         turn_right()
         robot.straight(20)
     elif instruction == "left":
-        print("left \n")
-        go_over_line()
+        robot.straight(straight_distance)
         turn_left()
         robot.straight(20)
     elif instruction == "turn_around":
@@ -77,84 +101,35 @@ def run_instruction():
         turn_around_without_box()
     elif instruction == "turn_360":
         turn_360()
-    else:
-        warning_beep()
-    ev3.speaker.beep()
 
 
-def correct_robot():
-    if is_on_left_line():
-        turn_right_amount(10)
-    elif is_on_right_line():
-        turn_left_amount(5)
-    else:
-        print("Not on left or right \n")
-        while not is_on_center_line():
-            turn_left_amount(10)
-            if is_on_center_line():
-                return
-            print("Left not fit \n")
-            print("Turning right \n")
-            turn_right_amount(40)
-            if is_on_center_line():
-                return
-            print("Neither fit \n")
+def turn_around_without_box():
+    robot.straight(-70)
+    turn_around()
 
 
-def is_on_left_line():
-    return left_light.reflection() < REFLECTION_RATE
+def turn_around():
+    robot.turn(200)
 
 
-def is_on_right_line():
-    return right_light.reflection() < REFLECTION_RATE
-
-
-def is_on_center_line():
-    return center_light.reflection() < REFLECTION_RATE
+def turn_360():
+    robot.turn(360)
 
 
 def is_intersection():
-    return is_on_left_line() and is_on_right_line() and is_on_center_line()
+    return right_on_line() and left_on_line()
 
 
 def is_corner():
-    if is_on_center_line() and is_on_right_line():
-        robot.straight(30)
-        if is_on_center_line() and is_on_right_line():
-            robot.straight(-30)
-            print("right corner \n")
-            return True
-        else:
-            robot.straight(-30)
-            print("not right corner \n")
-            turn_right_amount(30)
-            return False
-    elif is_on_center_line() and is_on_left_line():
-        if is_on_center_line() and is_on_left_line():
-            robot.straight(-30)
-            print("left corner \n")
-            return True
-        else:
-            robot.straight(-30)
-            print("not left corner \n")
-            turn_left_amount(30)
-            return False
-    else:
-        return False
+    return right_on_line() or left_on_line()
 
 
-def is_right_corner():
-    if is_on_center_line() and is_on_right_line():
-        return True
-    else:
-        return False
+def right_on_line():
+    return right_sensor.reflection() < REFLECTION_RATE
 
 
-def is_left_corner():
-    if is_on_center_line() and is_on_left_line():
-        return True
-    else:
-        return False
+def left_on_line():
+    return left_sensor.reflection() < REFLECTION_RATE
 
 
 def turn_right():
@@ -165,19 +140,6 @@ def turn_left():
     robot.turn(-TURN_RADIUS)
 
 
-def turn_around():
-    robot.turn(180)
-
-
-def turn_around_without_box():
-    robot.straight(-110)
-    turn_around()
-
-
-def turn_360():
-    robot.turn(360)
-
-
 def turn_right_amount(degrees):
     robot.turn(degrees)
 
@@ -186,10 +148,27 @@ def turn_left_amount(degrees):
     robot.turn(-degrees)
 
 
-def straight():
-    robot.drive(SPEED, 0)
+def go_straight():
+    # Calculate the deviation from the threshold.
+    deviation = center_sensor.reflection() - threshold
+
+    # Calculate the turn rate.
+    turn_rate = PROPORTIONAL_GAIN * deviation
+
+    # Set the drive base speed and turn rate.
+    robot.drive(DRIVE_SPEED, turn_rate)
+
+    # You can wait for a short time or do other things in this loop.
+    wait(10)
 
 
-run()
-
-# ev3.speaker.beep()
+print(get_direction())
+turn_left()
+print(get_direction())
+turn_left()
+print(get_direction())
+turn_left()
+print(get_direction())
+turn_left()
+print(get_direction())
+turn_left()
