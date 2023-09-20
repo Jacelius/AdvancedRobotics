@@ -32,7 +32,7 @@ WHITE = 100
 threshold = (BLACK + WHITE) / 2
 
 # Set the drive speed at 100 millimeters per second.
-DRIVE_SPEED = 100
+DRIVE_SPEED = 150
 
 # Set the gain of the proportional line controller. This means that for every
 # percentage point of light deviating from the threshold, we set the turn
@@ -41,8 +41,8 @@ DRIVE_SPEED = 100
 # For example, if the light value deviates from the threshold by 10, the robot
 # steers at 10*1.2 = 12 degrees per second.
 PROPORTIONAL_GAIN = 1.2
-INSTRUCTIONS = ["right", "straight", "turn_around_without_box",
-                "left", "left", "left", "straight", "straight"]
+INSTRUCTIONS = ["right", "up",
+                "left", "down", "left", "up", "right", "down"]
 
 # Write your program here.
 
@@ -51,13 +51,13 @@ def run():
     while len(INSTRUCTIONS) > 0:
         if is_intersection():
             print("intersection")
-            run_instruction()
+            run_instruction_with_direction()
         elif right_on_line():
             print("right corner")
-            run_instruction()
+            run_instruction_with_direction()
         elif left_on_line():
             print("left corner")
-            run_instruction()
+            run_instruction_with_direction()
         else:
             go_straight()
 
@@ -75,6 +75,77 @@ def get_direction():
         return "left"
     else:
         return "Unknown angle: " + str(angle) + " degrees"
+
+
+def run_instruction_with_direction():
+    instruction = INSTRUCTIONS.pop(0)
+    direction = get_direction()
+    straight_distance = 0
+    if len(INSTRUCTIONS) > 0:
+        straight_distance = 80
+    print("Instruction: " + instruction)
+
+    if instruction == "up":
+        if direction == "up":
+            robot.straight(straight_distance)  # TODO: Check if this is correct
+        elif direction == "right":
+            execute_corner(turn_left)
+        elif direction == "left":
+            execute_corner(turn_right)
+        elif direction == "down":
+            turn_around_without_box()
+        else:
+            print("Unknown direction: " + direction +
+                  ", with instruction: " + instruction)
+        print(instruction, direction)
+    elif instruction == "down":
+        if direction == "up":
+            turn_around_without_box()
+        elif direction == "right":
+            execute_corner(turn_right)
+        elif direction == "left":
+            execute_corner(turn_left)
+        elif direction == "down":
+            robot.straight(straight_distance)  # TODO: Check if this is correct
+        else:
+            print("Unknown direction: " + direction +
+                  ", with instruction: " + instruction)
+        print(instruction, direction)
+
+    elif instruction == "right":
+        if direction == "up":
+            execute_corner(turn_right)
+        elif direction == "right":
+            robot.straight(straight_distance)
+        elif direction == "left":
+            turn_around_without_box()
+        elif direction == "down":
+            execute_corner(turn_left)
+        else:
+            print("Unknown direction: " + direction +
+                  ", with instruction: " + instruction)
+        print(instruction, direction)
+    elif instruction == "left":
+        if direction == "up":
+            execute_corner(turn_right)
+        elif direction == "right":
+            turn_around_without_box()
+        elif direction == "left":
+            robot.straight(straight_distance)
+        elif direction == "down":
+            execute_corner(turn_left)
+        else:
+            print("Unknown direction: " + direction +
+                  ", with instruction: " + instruction)
+        print(instruction, direction)
+    else:
+        print("Unknown instruction: " + instruction)
+
+
+def execute_corner(function):
+    robot.straight(80)
+    function()
+    robot.straight(20)
 
 
 def run_instruction():
@@ -162,13 +233,4 @@ def go_straight():
     wait(10)
 
 
-print(get_direction())
-turn_left()
-print(get_direction())
-turn_left()
-print(get_direction())
-turn_left()
-print(get_direction())
-turn_left()
-print(get_direction())
-turn_left()
+run()
