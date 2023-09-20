@@ -74,6 +74,10 @@ def print_grid(grid,state):
 def is_valid_new_state(proposed_state):
     man_coords, diamond_coords = proposed_state
     for coord in diamond_coords: 
+        other_diamond_coords = diamond_coords.copy()
+        other_diamond_coords.remove(coord)
+        if coord in other_diamond_coords:
+            return False
         if is_corner(coord):
             if coord not in goal_coords:
                 return False # avoid pushing diamond into corner
@@ -201,6 +205,8 @@ def search(state,grid):
         
     else:
         print_grid(grid, state)
+        print(state)
+        print(goal_coords)
         left_state = get_next_state(state, "left")
         right_state = get_next_state(state, "right")
         up_state = get_next_state(state, "up")
