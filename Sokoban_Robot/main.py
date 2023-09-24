@@ -32,7 +32,7 @@ WHITE = 100
 threshold = (BLACK + WHITE) / 2
 
 # Set the drive speed at 100 millimeters per second.
-DRIVE_SPEED = 150
+DRIVE_SPEED = 250
 
 # Set the gain of the proportional line controller. This means that for every
 # percentage point of light deviating from the threshold, we set the turn
@@ -41,8 +41,8 @@ DRIVE_SPEED = 150
 # For example, if the light value deviates from the threshold by 10, the robot
 # steers at 10*1.2 = 12 degrees per second.
 PROPORTIONAL_GAIN = 1.2
-INSTRUCTIONS = ["right", "up",
-                "left", "down", "left", "up", "right", "down"]
+INSTRUCTIONS = ['down', 'down', 'right', 'right', "right", "turn_around", "back",
+                'up', 'left', "left", "turn_around", "back", "up", "up", "turn_around", "back", "left", "up", "right", "right", "right", "right"]
 
 # Write your program here.
 
@@ -50,13 +50,16 @@ INSTRUCTIONS = ["right", "up",
 def run():
     while len(INSTRUCTIONS) > 0:
         if is_intersection():
+            robot.stop()
             print("intersection")
             run_instruction_with_direction()
         elif right_on_line():
             print("right corner")
+            robot.stop()
             run_instruction_with_direction()
         elif left_on_line():
             print("left corner")
+            robot.stop()
             run_instruction_with_direction()
         else:
             go_straight()
@@ -65,13 +68,13 @@ def run():
 def get_direction():
     angle = robot.angle() % 360
 
-    if angle > 330 or angle < 30:
-        return "front"
-    elif angle > 60 and angle < 120:
+    if angle > 315 or angle < 45:
+        return "up"
+    elif angle > 46 and angle < 135:
         return "right"
-    elif angle > 150 and angle < 210:
-        return "back"
-    elif angle > 240 and angle < 300:
+    elif angle > 136 and angle < 225:
+        return "down"
+    elif angle > 226 and angle < 314:
         return "left"
     else:
         return "Unknown angle: " + str(angle) + " degrees"
@@ -79,6 +82,11 @@ def get_direction():
 
 def run_instruction_with_direction():
     instruction = INSTRUCTIONS.pop(0)
+    next_instruction = ""
+    try:
+        next_instruction = INSTRUCTIONS[0]
+    except:
+        print("No next instruction")
     direction = get_direction()
     straight_distance = 0
     if len(INSTRUCTIONS) > 0:
@@ -89,9 +97,9 @@ def run_instruction_with_direction():
         if direction == "up":
             robot.straight(straight_distance)  # TODO: Check if this is correct
         elif direction == "right":
-            execute_corner(turn_left)
+            execute_corner(turn_left, next_instruction)
         elif direction == "left":
-            execute_corner(turn_right)
+            execute_corner(turn_right, next_instruction)
         elif direction == "down":
             turn_around_without_box()
         else:
@@ -102,9 +110,9 @@ def run_instruction_with_direction():
         if direction == "up":
             turn_around_without_box()
         elif direction == "right":
-            execute_corner(turn_right)
+            execute_corner(turn_right, next_instruction)
         elif direction == "left":
-            execute_corner(turn_left)
+            execute_corner(turn_left, next_instruction)
         elif direction == "down":
             robot.straight(straight_distance)  # TODO: Check if this is correct
         else:
@@ -114,38 +122,45 @@ def run_instruction_with_direction():
 
     elif instruction == "right":
         if direction == "up":
-            execute_corner(turn_right)
+            execute_corner(turn_right, next_instruction)
         elif direction == "right":
             robot.straight(straight_distance)
         elif direction == "left":
             turn_around_without_box()
         elif direction == "down":
-            execute_corner(turn_left)
+            execute_corner(turn_left, next_instruction)
         else:
             print("Unknown direction: " + direction +
                   ", with instruction: " + instruction)
         print(instruction, direction)
     elif instruction == "left":
         if direction == "up":
-            execute_corner(turn_right)
+            execute_corner(turn_left, next_instruction)
         elif direction == "right":
             turn_around_without_box()
         elif direction == "left":
             robot.straight(straight_distance)
         elif direction == "down":
-            execute_corner(turn_left)
+            execute_corner(turn_right, next_instruction)
         else:
             print("Unknown direction: " + direction +
                   ", with instruction: " + instruction)
         print(instruction, direction)
+    elif instruction == "turn_around":
+        turn_around_without_box()
+    elif instruction == "back":
+        robot.straight(-10)
     else:
         print("Unknown instruction: " + instruction)
 
 
-def execute_corner(function):
-    robot.straight(80)
-    function()
-    robot.straight(20)
+def execute_corner(function, next_instruction):
+    if next_instruction == "turn_around":
+        function()
+    else:
+        robot.straight(80)
+        function()
+        robot.straight(20)
 
 
 def run_instruction():
@@ -233,4 +248,5 @@ def go_straight():
     wait(10)
 
 
+turn_around()
 run()
