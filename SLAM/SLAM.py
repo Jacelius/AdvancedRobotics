@@ -16,7 +16,6 @@ LIDAR_DEVICE = '/dev/ttyUSB0'
 wheel_radius_mm = 21
 half_axl_length_mm = 45
 
-
 class LidarController:
     def __init__(self, device, slam_obj, thymio_vehicle_obj):
         self.lidar = Lidar(device)
@@ -154,11 +153,21 @@ async def mainLoop(lidar, delay):
 
         # Check for obstacle behind (angle range: 150 to 210 degrees, distance threshold: 1000 mm)
         if lidar.check_obstacle_behind(FRONT_ANGLE, 300):
+            # lidar.mqtt_client.publish(
+            #     topic="shouldturn_MAGLEVA/", payload="True")
+            o = lidar.pose[2]
+            if (o < 0):
+                o = 360 + o
             lidar.mqtt_client.publish(
-                topic="shouldturn_MAGLEVA/", payload="True")
+                topic="shouldturn_MAGLEVA/", payload=(json.dumps({"x_coord": str(lidar.pose[0]), "y_coord": str(lidar.pose[1]), "orientation": str(o), "should_turn": "True"})))
         else:
+            # lidar.mqtt_client.publish(
+            #     topic="shouldturn_MAGLEVA/", payload="False")
+            o = lidar.pose[2]
+            if (o < 0):
+                o = 360 + o
             lidar.mqtt_client.publish(
-                topic="shouldturn_MAGLEVA/", payload="False")
+                topic="shouldturn_MAGLEVA/", payload=(json.dumps({"x_coord": str(lidar.pose[0]), "y_coord": str(lidar.pose[1]), "orientation": str(o), "should_turn": "False"})))
 
         await asyncio.sleep(delay)
     lidar.stop()

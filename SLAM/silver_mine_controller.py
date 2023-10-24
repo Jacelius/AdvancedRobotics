@@ -22,7 +22,8 @@ Setup:
 from tdmclient import ClientAsync
 import paho.mqtt.client as mqtt
 import time
-
+import math
+import json
 
 class ThymioController:
     def __init__(self):
@@ -39,6 +40,10 @@ class ThymioController:
         self.client.on_message = self.on_message
 
         self.connect_to_broker()
+
+        self.x = 7500
+        self.y = 7500
+        self.o = 0
 
         self.should_turn = False
 
@@ -57,6 +62,18 @@ class ThymioController:
                 print("Is turning")
                 return [300, -300]
             return [500, 500]
+
+        def point_towards_original(x_current, y_current, orientation_current_deg):
+            # Calculate the angle between the current position and the original position
+            angle_rad = math.atan2(7500 - y_current, 7500 - x_current)
+            
+            # Convert the angle from radians to degrees
+            angle_deg = math.degrees(angle_rad)
+            
+            # Calculate the new orientation that points towards the original coordinates
+            new_orientation_deg = angle_deg - orientation_current_deg
+            
+            return new_orientation_deg
 
         # Use the ClientAsync context manager to handle the connection to the Thymio robot.
         with ClientAsync() as client:
@@ -77,10 +94,29 @@ class ThymioController:
                         if is_silver_mine(node.v.prox.ground.reflected):
                             # Change color to green
                             self.client.publish(topic="silver_mine_MAGLEVA/", payload="True")
+                            print(str(self.x) + " " + str(self.y) + " " + str(self.o))
+                            print(point_towards_original(self.x, self.y, self.o))
                             node.v.leds.top = [0, 32, 0]
                             node.v.motor.left.target = 0
                             node.v.motor.right.target = 0
                             node.flush()
+
+                            node.v.motor.left.target = 300
+                            node.v.motor.right.target = -300
+
+                            node.flush()
+                            
+                            await client.sleep(0.3)
+
+                            node.v.motor.left.target = 0
+                            node.v.motor.right.target = 0
+
+                            node.flush()
+
+                            await client.sleep(2)
+
+                            print(point_towards_original(self.x, self.y, self.o))
+
                             break
 
                         # print("This is shouldturn: " + str(self.should_turn))
@@ -106,13 +142,19 @@ class ThymioController:
 
     def on_message(self, client, userdata, msg):
         try:
-            message = msg.payload.decode('utf-8')
-            if message == "True":
+            json_str = msg.payload.decode('utf-8')
+            message = json.loads(json_str)
+            if message["should_turn"] == "True":
                 self.should_turn = True
-            elif message == "False":
+            elif message["should_turn"] == "False":
                 self.should_turn = False
             else:
                 print("Invalid message received. Expecting 'True' or 'False'.")
+
+            self.x = float(float(message["x_coord"]))
+            self.y = float(float(message["y_coord"]))
+            self.o = float(float(message["orientation"]))
+
             # print("on_message: ", message)
             # print("new Should_turn: " + str(self.should_turn))
         except Exception as e:
@@ -124,6 +166,29 @@ class ThymioController:
 
     def disconnect_from_broker(self):
         self.client.disconnect()
+        
+    def turn_angle(angle):
+        wheel_radius_mm = 21
+        half_axl_length_mm = 45
+        # Calculate the distance between the center of the robot and the wheels
+        wheel_distance = 45
+
+        # Calculate the distance between the center of the robot and the wheels
+        wheel_radius = 21
+
+        # Calculate the distance the wheels need to travel to make the robot turn the desired angle
+        wheel_turn_distance = (wheel_distance * math.pi * angle) / 360
+
+        # Calculate the number of ticks the wheels need to travel to make the robot turn the desired angle
+        wheel_turn_ticks = wheel_turn_distance / wheel_radius
+
+        # Calculate the speed of the wheels to make the robot turn the desired angle
+        wheel_turn_speed = wheel_turn_ticks / 0.3
+
+        return wheel_turn_speed
+        
+        
+
 
 
 if __name__ == "__main__":
