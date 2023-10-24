@@ -94,7 +94,7 @@ class ThymioController:
             print("Reconnect failed after %s attempts. Exiting...", reconnect_count)
 
 
-        def isSilverMine(prox_values):
+        def is_silver_mine(prox_values):
             left_value = prox_values[0]
             right_value = prox_values[4]
             if left_value > 800 or right_value > 800:
