@@ -6,10 +6,10 @@ from paho.mqtt import client as mqtt_client
 import numpy as np
 
 
-broker="res85.itu.dk"
+broker = "res85.itu.dk"
 port = 1883
-topic = "mapdata/"
-client_id = f'python-mqtt-{"myclientID2233"}'
+topic = "mapdata_magleva/"
+client_id = f'python-mqtt-{"MAGLEVA"}'
 username = 'advanced2023'
 password = 'theowlsarenot1992'
 
@@ -79,7 +79,8 @@ def subscribe(client: mqtt_client):
                     orientation = float(doc["orientation"])
                     if (orientation < 0):
                         orientation = 360 + orientation
-                    print("x: " +str(pos_x_coord)+", y: "+str(pos_y_coord)+", o: "+str(orientation))
+                    print("x: " + str(pos_x_coord)+", y: " +
+                          str(pos_y_coord)+", o: "+str(orientation))
             except:
                 print("deserialization of json failed")
         else:
@@ -97,7 +98,7 @@ subscribe(client)
 
 # pygame setup
 pygame.init()
-sprite = pygame.image.load('Visualizer/arrow.gif')
+sprite = pygame.image.load('arrow.gif')
 
 while running:
     # poll for events
@@ -108,9 +109,8 @@ while running:
             running = False
     # these are used, but this is how you can transform the bytearray to a matrix
     try:
-        mapimg = np.reshape(np.frombuffer(mapbytes, dtype=np.uint8), (250, 250))
-
-
+        mapimg = np.reshape(np.frombuffer(
+            mapbytes, dtype=np.uint8), (250, 250))
 
     except:
         print("skipping this one")
@@ -127,7 +127,7 @@ while running:
             pygame.draw.rect(screen, (255 - int(value), 255 - int(value), 255 - int(value), 255),
                              pygame.Rect(x_cord, y_cord, 2, 2))
 
-    rot_image = pygame.transform.rotate(sprite,270  - orientation)
+    rot_image = pygame.transform.rotate(sprite, 270 - orientation)
     screen.blit(rot_image, ((pos_x_coord) * 2, (pos_y_coord) * 2))
     # flip() the display to put your work on screen
     pygame.display.flip()
