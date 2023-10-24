@@ -21,6 +21,8 @@ mapbytes = bytearray(250 * 250)
 pos_x_coord = 250
 pos_y_coord = 250
 orientation = 0
+iron_ingot_coords = (0, 0)
+should_draw_silver = False
 
 
 def connect_mqtt():
@@ -69,6 +71,7 @@ def subscribe(client: mqtt_client):
         if (len(msg.payload) < 200):
             try:
                 json_str = msg.payload.decode('utf-8')
+
                 if ("x_coord" in json_str):
                     doc = json.loads(json_str)
                     global pos_x_coord
@@ -79,6 +82,14 @@ def subscribe(client: mqtt_client):
                     orientation = float(doc["orientation"])
                     if (orientation < 0):
                         orientation = 360 + orientation
+                    global iron_ingot_coords, should_draw_silver
+                    if ("silver_mine" in json_str):
+                        print("FOUND SILVER")
+                        iron_x = pos_x_coord
+                        iron_y = pos_y_coord
+                        iron_ingot_coords = (iron_x, iron_y)
+                        should_draw_silver = True
+
                     print("x: " + str(pos_x_coord)+", y: " +
                           str(pos_y_coord)+", o: "+str(orientation))
             except:
@@ -99,6 +110,13 @@ subscribe(client)
 # pygame setup
 pygame.init()
 sprite = pygame.image.load('arrow.gif')
+sprite = pygame.transform.scale(sprite, (16, 16))
+
+starting_image = pygame.image.load('start.png')
+starting_image = pygame.transform.scale(starting_image, (16, 16))
+
+iron_image = pygame.image.load('iron.png')
+iron_image = pygame.transform.scale(iron_image, (16, 16))
 
 while running:
     # poll for events
@@ -120,6 +138,7 @@ while running:
     # RENDER YOUR GAME HERE
     # pygame.draw.rect(screen, "black", pygame.Rect(50, 50, 1000, 1000), width=5)
     for i in range(len(mapimg)):
+        screen.blit(starting_image, (125 * 2, 125 * 2))
         for j in range(len(mapimg[0])):
             y_cord = i * 2
             x_cord = j * 2
@@ -129,6 +148,9 @@ while running:
 
     rot_image = pygame.transform.rotate(sprite, 270 - orientation)
     screen.blit(rot_image, ((pos_x_coord) * 2, (pos_y_coord) * 2))
+    if should_draw_silver:
+        screen.blit(
+            iron_image, (iron_ingot_coords[0] * 2, iron_ingot_coords[1] * 2))
     # flip() the display to put your work on screen
     pygame.display.flip()
 
