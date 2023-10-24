@@ -4,6 +4,7 @@ from breezyslam.sensors import RPLidarA1 as LaserModel
 from rplidar import RPLidar as Lidar
 from thymio_vehicle import ThymioVehicle
 from visualize_thymio_file import visualizer
+from paho.mqtt import client as mqtt_client
 import multiprocessing
 from multiprocessing import Pipe
 import asyncio
@@ -30,6 +31,38 @@ class LidarController:
 
         # Create an iterator to collect scan data from the RPLidar
         self.iterator = self.lidar.iter_scans()
+
+        # Connect to MQTT broker
+        self.mqtt_client = self.connect_mqtt()
+
+        def connect_mqtt(self):
+            broker = "res85.itu.dk"
+            port = 1883
+            client_id = f'python-mqtt-{"MAGLEVA"}'
+            username = 'advanced2023'
+            password = 'theowlsarenot1992'
+
+            def on_connect(client, userdata, flags, rc):
+                if rc == 0:
+                    print("Connected to MQTT Broker!")
+                else:
+                    print(f"Failed to connect, return code {rc}")
+
+            client = mqtt.Client(client_id)
+            client.username_pw_set(username, password)
+            client.on_connect = on_connect
+            client.connect(broker, port)
+            return client
+
+    def check_obstacle_behind(self, behind_angle_range_degrees, threshold_distance):
+        for item in next(self.iterator):
+            angle = item[1]
+            distance = item[2]
+            if angle >= behind_angle_range_degrees[0] and angle <= behind_angle_range_degrees[1]:
+                if distance < threshold_distance:
+                    print("Object detected behind!")
+                    return True
+        return False
 
     async def update(self):
         previous_distances = None
@@ -91,18 +124,25 @@ async def mainLoop(lidar, delay):
     task = asyncio.create_task(lidar.update())
     while Running:
         lidar.publish()
+
+        # Check for obstacle behind (angle range: 150 to 210 degrees, distance threshold: 1000 mm)
+        if lidar.check_obstacle_behind((150, 210), 1000):
+            lidar.mqtt_client.publish(topic="shouldturn_MAGLEVA/", payload="True")
+
+        else:
+            lidar.mqtt_client.publish(topic="shouldturn_MAGLEVA/", payload="False")
+
         await asyncio.sleep(delay)
     lidar.stop()
     lidar.disconnect()
     await task
-
 
 if __name__ == "__main__":
     try:
         thymio = ThymioVehicle(wheel_radius_mm, half_axl_length_mm, None)
         slam = RMHC_SLAM(LaserModel(), MAP_SIZE_PIXELS, MAP_SIZE_METERS)
         lidar = LidarController(LIDAR_DEVICE, slam, thymio)
-        loop = asyncio.run(mainLoop(lidar, 0.5))
+        loop = asyncio.run(mainLoop(lidar, 1))
     except KeyboardInterrupt:
         Running = False
         lidar.stop()

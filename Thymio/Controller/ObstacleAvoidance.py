@@ -20,29 +20,93 @@ Setup:
 """
 
 from tdmclient import ClientAsync
+from paho.mqtt import client as mqtt_client
+import time
 
 
 class ThymioController:
     def __init__(self):
 
-        def behaviorOA(prox_values):
-            """
-            Obstacle avoidance behavior function.
-            Given the proximity sensor values, it determines the Thymio's motion.
-            """
+        broker="res85.itu.dk"
+        port = 1883
+        topic = "shouldturn_MAGLEVA/"
+        client_id = f'python-mqtt-{"MAGLEVA"}'
+        username = 'advanced2023'
+        password = 'theowlsarenot1992'
 
-            # If an object is detected in front
-            if prox_values[2] > 1500:
-                return -100, -100
-            # If an object is detected on the left
-            elif prox_values[0] > 1000:
-                return -100, 100
-            # If an object is detected on the right
-            elif prox_values[4] > 1000:
-                return 100, -100
-            # If no object is detected, move forward
+        should_turn = False
+        client = connect_mqtt()
+        client.on_disconnect = on_disconnect
+        subscribe(client)
+
+        def connect_mqtt():
+            def on_connect(client, userdata, flags, rc):
+                if rc == 0:
+                    print("Connected to MQTT Broker!")
+                else:
+                    print("Failed to connect, return code %d\n", rc)
+
+            # Set Connecting Client ID
+            client = mqtt_client.Client(client_id)
+            client.username_pw_set(username, password)
+            client.on_connect = on_connect
+            client.connect(broker, port)
+            return client
+        
+        def subscribe(client: mqtt_client):
+            def on_message(msg):
+                try:
+                    message = msg.payload.decode('utf-8')
+                    if message == "True":
+                        self.should_turn = True
+                    elif message == "False":
+                        self.should_turn = False
+                    else:
+                        print("Invalid message received. Expecting 'True' or 'False'.")
+                except Exception as e:
+                    print(f"Error processing message: {e}")
+
+            # this only runs the first time to setup callback
+            client.subscribe(topic)
+            client.on_message = on_message
+
+        def on_disconnect(client, userdata, rc):
+            FIRST_RECONNECT_DELAY = 1
+            RECONNECT_RATE = 2
+            MAX_RECONNECT_COUNT = 12
+            MAX_RECONNECT_DELAY = 60
+            print("Disconnected with result code: %s", rc)
+            reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
+            while reconnect_count < MAX_RECONNECT_COUNT:
+                print("Reconnecting in %d seconds...", reconnect_delay)
+                time.sleep(reconnect_delay)
+
+                try:
+                    client.reconnect()
+                    print("Reconnected successfully!")
+                    return
+                except Exception as err:
+                    print("%s. Reconnect failed. Retrying...", err)
+
+                reconnect_delay *= RECONNECT_RATE
+                reconnect_delay = min(reconnect_delay, MAX_RECONNECT_DELAY)
+                reconnect_count += 1
+            print("Reconnect failed after %s attempts. Exiting...", reconnect_count)
+
+
+        def isSilverMine(prox_values):
+            left_value = prox_values[0]
+            right_value = prox_values[4]
+            if left_value > 800 or right_value > 800:
+                return True
             else:
-                return 100, 100
+                return False
+            
+        def behavior():
+            #If we should turn we turn otherwise we go straight
+            if self.should_turn:
+                return [100, -100]
+            return [100, 100]
 
         # Use the ClientAsync context manager to handle the connection to the Thymio robot.
         with ClientAsync() as client:
@@ -50,25 +114,25 @@ class ThymioController:
             async def prog():
                 """
                 Asynchronous function controlling the Thymio's behavior.
-                """
-
+                """ 
                 # Lock the node representing the Thymio to ensure exclusive access.
                 with await client.lock() as node:
-
-                    # Wait for the robot's proximity sensors to be ready.
-                    await node.wait_for_variables({"prox.horizontal"})
-
-                    node.send_set_variables({"leds.top": [0, 0, 32]})
-                    print("Thymio started successfully!")
-                    while True:
-                        prox_values = node.v.prox.horizontal
-
-                        if sum(prox_values) > 20000:
+                    while True: 
+                    
+                        if isSilverMine(node.v.prox.ground.reflected):
+                            #Change color to green
+                            node.v.leds.top = [0, 32, 0]
+                            node.v.motor.left.target = 0
+                            node.v.motor.right.target = 0
+                            node.flush()
                             break
 
-                        speeds = behaviorOA(prox_values)
+                        speeds = behavior()
                         node.v.motor.left.target = speeds[1]
                         node.v.motor.right.target = speeds[0]
+
+
+
                         node.flush()  # Send the set commands to the robot.
 
                         await client.sleep(0.3)  # Pause for 0.3 seconds before the next iteration.
@@ -77,7 +141,7 @@ class ThymioController:
                     print("Thymio stopped successfully!")
                     node.v.motor.left.target = 0
                     node.v.motor.right.target = 0
-                    node.v.leds.top = [32, 0, 0]
+                    node.v.leds.top = [0, 0, 32]
                     node.flush()
 
             # Run the asynchronous function to control the Thymio.
