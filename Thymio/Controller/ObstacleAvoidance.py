@@ -119,7 +119,7 @@ class ThymioController:
                 with await client.lock() as node:
                     while True: 
                     
-                        if isSilverMine(node.v.prox.ground.reflected):
+                        if is_silver_mine(node.v.prox.ground.reflected):
                             #Change color to green
                             node.v.leds.top = [0, 32, 0]
                             node.v.motor.left.target = 0
