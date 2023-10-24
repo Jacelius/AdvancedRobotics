@@ -4,6 +4,7 @@ from breezyslam.sensors import RPLidarA1 as LaserModel
 from rplidar import RPLidar as Lidar
 from thymio_vehicle import ThymioVehicle
 from visualize_thymio_file import visualizer
+from paho.mqtt import client as mqtt_client
 import multiprocessing
 from multiprocessing import Pipe
 import asyncio
