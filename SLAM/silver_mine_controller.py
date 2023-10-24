@@ -29,7 +29,7 @@ class ThymioController:
         self.broker = "res85.itu.dk"
         self.port = 1883
         self.topic = "shouldturn_MAGLEVA/"
-        self.client_id = f'python-mqtt-{"MAGLEVA_Controller"}'
+        self.client_id = f'python-mqtt-{"MAGLEVA_CONTROLLER"}'
         self.username = 'advanced2023'
         self.password = 'theowlsarenot1992'
 
@@ -54,8 +54,9 @@ class ThymioController:
         def behavior():
             # If we should turn we turn otherwise we go straight
             if self.should_turn:
+                print("Is turning")
                 return [300, -300]
-            return [300, 300]
+            return [500, 500]
 
         # Use the ClientAsync context manager to handle the connection to the Thymio robot.
         with ClientAsync() as client:
@@ -75,6 +76,7 @@ class ThymioController:
 
                         if is_silver_mine(node.v.prox.ground.reflected):
                             # Change color to green
+                            self.client.publish(topic="silver_mine_MAGLEVA/", payload="True")
                             node.v.leds.top = [0, 32, 0]
                             node.v.motor.left.target = 0
                             node.v.motor.right.target = 0
@@ -111,8 +113,8 @@ class ThymioController:
                 self.should_turn = False
             else:
                 print("Invalid message received. Expecting 'True' or 'False'.")
-            print("on_message: ", message)
-            print("new Should_turn: " + str(self.should_turn))
+            # print("on_message: ", message)
+            # print("new Should_turn: " + str(self.should_turn))
         except Exception as e:
             print(f"Error processing message: {e}")
 

@@ -34,6 +34,25 @@ class LidarController:
 
         # Connect to MQTT broker
         self.mqtt_client = self.connect_mqtt()
+        self.mqtt_client.on_message = self.on_message
+        self.mqtt_client.loop_start()
+
+    def on_message(self, client, userdata, msg):
+        try:
+            message = msg.payload.decode('utf-8')
+            print("got message")
+            if message == "True":
+                print("FOUND SILVER MINE. SENDING COORDS: " + str(self.pose[0]) + " " + str(self.pose[1]))
+                pos_x_coord = self.pose[0] / 15000 * 250
+                pos_y_coord = self.pose[1] / 15000 * 250
+                orientation = self.pose[2]
+                if (orientation < 0):
+                    orientation = 360 + orientation
+                print("x: " + str(pos_x_coord)+", y: " + str(pos_y_coord)+", o: "+str(orientation))
+                client.publish(topic="silver_coordinates_MAGLEVA/", payload=json.dumps({"x_coord": str(pos_x_coord), "y_coord": str(pos_y_coord), "orientation": str(orientation)}))
+                self.viz.publish(json.dumps({"x_coord": str(self.pose[0]), "y_coord": str(self.pose[1]), "orientation": str(self.pose[2]), "silver_mine": "True"}))
+        except Exception as e:
+            print(f"Error processing message: {e}")
 
     def connect_mqtt(self):
         broker = "res85.itu.dk"
@@ -44,7 +63,8 @@ class LidarController:
 
         def on_connect(client, userdata, flags, rc):
             if rc == 0:
-                print("Connected to MQTT Broker!")
+                print("Connected to MQTT Broker!") 
+                self.mqtt_client.subscribe(topic="silver_mine_MAGLEVA/")           
             else:
                 print(f"Failed to connect, return code {rc}")
 
@@ -53,6 +73,8 @@ class LidarController:
         client.on_connect = on_connect
         client.connect(broker, port)
         return client
+
+    
 
     def check_obstacle_behind(self, behind_angle_range_degrees, threshold_distance):
         for item in next(self.iterator):
@@ -134,7 +156,6 @@ async def mainLoop(lidar, delay):
         if lidar.check_obstacle_behind(FRONT_ANGLE, 300):
             lidar.mqtt_client.publish(
                 topic="shouldturn_MAGLEVA/", payload="True")
-
         else:
             lidar.mqtt_client.publish(
                 topic="shouldturn_MAGLEVA/", payload="False")
@@ -149,7 +170,7 @@ if __name__ == "__main__":
         thymio = ThymioVehicle(wheel_radius_mm, half_axl_length_mm, None)
         slam = RMHC_SLAM(LaserModel(), MAP_SIZE_PIXELS, MAP_SIZE_METERS)
         lidar = LidarController(LIDAR_DEVICE, slam, thymio)
-        loop = asyncio.run(mainLoop(lidar, 1))
+        loop = asyncio.run(mainLoop(lidar, 0.1))
     except KeyboardInterrupt:
         Running = False
         lidar.stop()
