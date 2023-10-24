@@ -96,7 +96,7 @@ class ThymioController:
 
         def is_silver_mine(prox_values):
             left_value = prox_values[0]
-            right_value = prox_values[4]
+            right_value = prox_values[1]
             if left_value > 800 or right_value > 800:
                 return True
             else:
