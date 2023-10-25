@@ -25,6 +25,7 @@ import time
 import math
 import json
 
+
 class ThymioController:
     def __init__(self):
         self.broker = "res85.itu.dk"
@@ -41,11 +42,13 @@ class ThymioController:
 
         self.connect_to_broker()
 
-        self.x = 7500
-        self.y = 7500
-        self.o = 0
+        self.x_coord = 7500
+        self.y_coord = 7500
+        self.orientation = 0
 
         self.should_turn = False
+
+        self.speed = 500
 
         def is_silver_mine(prox_values):
             # print(prox_values)
@@ -59,21 +62,90 @@ class ThymioController:
         def behavior():
             # If we should turn we turn otherwise we go straight
             if self.should_turn:
-                print("Is turning")
                 return [300, -300]
-            return [500, 500]
+            return [self.speed, self.speed]
 
-        def point_towards_original(x_current, y_current, orientation_current_deg):
+        def ir_wall_follow(prox_values):
+            """
+            Obstacle avoidance behavior function.
+            Given the proximity sensor values, it determines the Thymio's motion.
+            """
+
+            # If an object is detected in front
+            if prox_values[2] > 1500:
+                return -100, -100
+            # If an object is detected on the left
+            elif prox_values[0] > 1000:
+                return -100, 100
+            # If an object is detected on the right
+            elif prox_values[4] > 1000:
+                return 100, -100
+            # If no object is detected, move forward
+            else:
+                return 100, 100
+
+        def get_angle_to_original_coords(x_current, y_current, orientation_current_deg):
             # Calculate the angle between the current position and the original position
+            # original coords is x: 7500, y: 7500
             angle_rad = math.atan2(7500 - y_current, 7500 - x_current)
-            
+
             # Convert the angle from radians to degrees
             angle_deg = math.degrees(angle_rad)
-            
+
             # Calculate the new orientation that points towards the original coordinates
             new_orientation_deg = angle_deg - orientation_current_deg
-            
-            return new_orientation_deg
+
+            # returns degrees in negative, so take abs
+            return abs(new_orientation_deg)
+
+        async def point_towards_original(client, node, delta_original):
+            # twist until we're 10 degrees within the original orientation
+            # with speed 300 and time 0.3 should be about 20 degrees
+            while delta_original < 5 or delta_original > 355:
+                if (delta_original > 180 > 0):
+                    # turn right
+                    l_speed, r_speed = turn_right()
+                    set_speeds(node, l_speed, r_speed)
+                    await client.sleep(0.3)
+                elif (delta_original < 180 < 360):
+                    # turn left
+                    l_speed, r_speed = turn_left()
+                    set_speeds(node, l_speed, r_speed)
+                    await client.sleep(0.3)
+                else:
+                    print(
+                        "Error: delta_original is not between 0 and 360. Delta_original: " + str(delta_original))
+
+        def set_speeds(node, left_speed, right_speed):
+            node.v.motor.left.target = left_speed
+            node.v.motor.right.target = right_speed
+            node.flush()  # Send the set commands to the robot.
+
+        def turn_left():
+            return [-300, 300]
+
+        def turn_right():
+            return [300, -300]
+
+        async def go_backwards(node, client, speed, time):
+            node.v.motor.left.target = -speed
+            node.v.motor.right.target = -speed
+            node.flush()  # Send the set commands to the robot.
+            await client.sleep(time)
+
+        def is_on_original_coords(x_current, y_current):
+            # max difference the robot can be off by
+            max_difference = 100
+            if ((x_current < 7500 + max_difference or x_current > 7500 - max_difference) and (y_current < 7500 + max_difference or y_current > 7500 - max_difference)):
+                return True
+            else:
+                return False
+
+        async def go_straight(node, client, time):
+            node.v.motor.left.target = self.speed
+            node.v.motor.right.target = self.speed
+            node.flush()  # Send the set commands to the robot.
+            await client.sleep(time)
 
         # Use the ClientAsync context manager to handle the connection to the Thymio robot.
         with ClientAsync() as client:
@@ -90,33 +162,47 @@ class ThymioController:
                     print("Thymio started successfully!")
 
                     while True:
-
+                        # Check if we're on the silver mine
                         if is_silver_mine(node.v.prox.ground.reflected):
                             # Change color to green
-                            self.client.publish(topic="silver_mine_MAGLEVA/", payload="True")
-                            print(str(self.x) + " " + str(self.y) + " " + str(self.o))
-                            print(point_towards_original(self.x, self.y, self.o))
-                            node.v.leds.top = [0, 32, 0]
-                            node.v.motor.left.target = 0
-                            node.v.motor.right.target = 0
-                            node.flush()
+                            self.client.publish(
+                                topic="silver_mine_MAGLEVA/", payload="True")
+                            print("Found silver mine on coords: " + str(self.x_coord) + " " +
+                                  str(self.y_coord) + " " + str(self.orientation))
 
-                            node.v.motor.left.target = 300
-                            node.v.motor.right.target = -300
+                            # go a bit backwards
+                            await go_backwards(node, client, 300, 1)
 
-                            node.flush()
-                            
-                            await client.sleep(0.3)
+                            while not is_on_original_coords(self.x_coord, self.y_coord):
+                                # return to original position
+                                # get difference in orientation between current and original
+                                delta_original = get_angle_to_original_coords(
+                                    self.x_coord, self.y_coord, self.orientation)
 
-                            node.v.motor.left.target = 0
-                            node.v.motor.right.target = 0
+                                await point_towards_original(client, node, delta_original)
 
-                            node.flush()
+                                # go straight until object is detected in front
+                                while not self.should_turn:
+                                    await go_straight(node, client, 0.5)
 
-                            await client.sleep(2)
+                                    # check if we're off course and break out of loop if we are to go onto course again. We can be off by 20 degrees
+                                    # this might fail as it should probably be the delta to the original orientation
+                                    # if (self.orientation > 10 and self.orientation < 350):
+                                    #     break
 
-                            print(point_towards_original(self.x, self.y, self.o))
+                                    # possible fix:
+                                    delta_original = get_angle_to_original_coords(
+                                        self.x_coord, self.y_coord, self.orientation)
+                                    if (delta_original > 10 and delta_original < 350):
+                                        break
 
+                                # corregate course by turning left or right or do wall following behavior. Maybe go a bit backwards first?
+                                t_end = time.time() + 20
+                                while time.time() < t_end:
+                                    l_speed, r_speed = ir_wall_follow(
+                                        node.v.prox.horizontal)
+                                    set_speeds(node, l_speed, r_speed)
+                                    await client.sleep(0.3)
                             break
 
                         # print("This is shouldturn: " + str(self.should_turn))
@@ -151,12 +237,10 @@ class ThymioController:
             else:
                 print("Invalid message received. Expecting 'True' or 'False'.")
 
-            self.x = float(float(message["x_coord"]))
-            self.y = float(float(message["y_coord"]))
-            self.o = float(float(message["orientation"]))
+            self.x_coord = float(float(message["x_coord"]))
+            self.y_coord = float(float(message["y_coord"]))
+            self.orientation = float(float(message["orientation"]))
 
-            # print("on_message: ", message)
-            # print("new Should_turn: " + str(self.should_turn))
         except Exception as e:
             print(f"Error processing message: {e}")
 
@@ -166,29 +250,6 @@ class ThymioController:
 
     def disconnect_from_broker(self):
         self.client.disconnect()
-        
-    def turn_angle(angle):
-        wheel_radius_mm = 21
-        half_axl_length_mm = 45
-        # Calculate the distance between the center of the robot and the wheels
-        wheel_distance = 45
-
-        # Calculate the distance between the center of the robot and the wheels
-        wheel_radius = 21
-
-        # Calculate the distance the wheels need to travel to make the robot turn the desired angle
-        wheel_turn_distance = (wheel_distance * math.pi * angle) / 360
-
-        # Calculate the number of ticks the wheels need to travel to make the robot turn the desired angle
-        wheel_turn_ticks = wheel_turn_distance / wheel_radius
-
-        # Calculate the speed of the wheels to make the robot turn the desired angle
-        wheel_turn_speed = wheel_turn_ticks / 0.3
-
-        return wheel_turn_speed
-        
-        
-
 
 
 if __name__ == "__main__":

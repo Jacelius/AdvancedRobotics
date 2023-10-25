@@ -112,9 +112,11 @@ pygame.init()
 sprite = pygame.image.load('arrow.gif')
 sprite = pygame.transform.scale(sprite, (16, 16))
 
+# start cross icon
 starting_image = pygame.image.load('start.png')
 starting_image = pygame.transform.scale(starting_image, (16, 16))
 
+# minecraft iron ingot
 iron_image = pygame.image.load('iron.png')
 iron_image = pygame.transform.scale(iron_image, (16, 16))
 
@@ -148,6 +150,7 @@ while running:
 
     rot_image = pygame.transform.rotate(sprite, 270 - orientation)
     screen.blit(rot_image, ((pos_x_coord) * 2, (pos_y_coord) * 2))
+    # drawing iron ingot if found
     if should_draw_silver:
         screen.blit(
             iron_image, (iron_ingot_coords[0] * 2, iron_ingot_coords[1] * 2))
