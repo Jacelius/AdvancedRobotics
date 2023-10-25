@@ -48,8 +48,6 @@ class ThymioController:
 
         self.should_turn = False
 
-        self.speed = 500
-
         def is_silver_mine(prox_values):
             # print(prox_values)
             left_value = prox_values[0]
@@ -63,7 +61,7 @@ class ThymioController:
             # If we should turn we turn otherwise we go straight
             if self.should_turn:
                 return [300, -300]
-            return [self.speed, self.speed]
+            return [500, 500]
 
         def ir_wall_follow(prox_values):
             """
@@ -98,20 +96,32 @@ class ThymioController:
             # returns degrees in negative, so take abs
             return abs(new_orientation_deg)
 
-        async def point_towards_original(client, node, delta_original):
+        async def point_towards_original(client, node, orientation):
             # twist until we're 10 degrees within the original orientation
             # with speed 300 and time 0.3 should be about 20 degrees
-            while delta_original < 5 or delta_original > 355:
-                if (delta_original > 180 > 0):
+            delta_original = orientation
+
+            
+            while delta_original < 10:
+                print(f"delta_original is: {str(delta_original)}")
+                if (delta_original > 180):
                     # turn right
                     l_speed, r_speed = turn_right()
                     set_speeds(node, l_speed, r_speed)
                     await client.sleep(0.3)
-                elif (delta_original < 180 < 360):
+                    node.v.motor.left.target = 0
+                    node.v.motor.right.target = 0
+                    node.flush()
+                    delta_original = get_angle_to_original_coords(self.x_coord, self.y_coord, self.orientation)
+                elif (delta_original < 180):
                     # turn left
                     l_speed, r_speed = turn_left()
                     set_speeds(node, l_speed, r_speed)
                     await client.sleep(0.3)
+                    node.v.motor.left.target = 0
+                    node.v.motor.right.target = 0
+                    node.flush()
+                    delta_original = get_angle_to_original_coords(self.x_coord, self.y_coord, self.orientation)
                 else:
                     print(
                         "Error: delta_original is not between 0 and 360. Delta_original: " + str(delta_original))
@@ -122,28 +132,29 @@ class ThymioController:
             node.flush()  # Send the set commands to the robot.
 
         def turn_left():
+            print("turn left")
             return [-300, 300]
 
         def turn_right():
+            print("turn right")
             return [300, -300]
-
-        async def go_backwards(node, client, speed, time):
-            node.v.motor.left.target = -speed
-            node.v.motor.right.target = -speed
-            node.flush()  # Send the set commands to the robot.
-            await client.sleep(time)
 
         def is_on_original_coords(x_current, y_current):
             # max difference the robot can be off by
-            max_difference = 100
-            if ((x_current < 7500 + max_difference or x_current > 7500 - max_difference) and (y_current < 7500 + max_difference or y_current > 7500 - max_difference)):
+            difference = 10
+            max_difference = 7500 + difference
+            min_difference = 7500 - difference
+            print(x_current, y_current)
+            if ((min_difference < x_current < max_difference) and (min_difference < y_current < max_difference)):
+                print("is on coords: "+ str(x_current) + " " + str(y_current))
                 return True
             else:
+                print("is not on coords: "+ str(x_current) + " " + str(y_current))
                 return False
 
         async def go_straight(node, client, time):
-            node.v.motor.left.target = self.speed
-            node.v.motor.right.target = self.speed
+            node.v.motor.left.target = 500
+            node.v.motor.right.target = 500
             node.flush()  # Send the set commands to the robot.
             await client.sleep(time)
 
@@ -170,14 +181,12 @@ class ThymioController:
                             print("Found silver mine on coords: " + str(self.x_coord) + " " +
                                   str(self.y_coord) + " " + str(self.orientation))
 
-                            # go a bit backwards
-                            await go_backwards(node, client, 300, 1)
-
                             while not is_on_original_coords(self.x_coord, self.y_coord):
                                 # return to original position
                                 # get difference in orientation between current and original
                                 delta_original = get_angle_to_original_coords(
                                     self.x_coord, self.y_coord, self.orientation)
+                                print("Delta original: " + str(delta_original))
 
                                 await point_towards_original(client, node, delta_original)
 
@@ -193,16 +202,17 @@ class ThymioController:
                                     # possible fix:
                                     delta_original = get_angle_to_original_coords(
                                         self.x_coord, self.y_coord, self.orientation)
+                                    
                                     if (delta_original > 10 and delta_original < 350):
                                         break
 
                                 # corregate course by turning left or right or do wall following behavior. Maybe go a bit backwards first?
-                                t_end = time.time() + 20
-                                while time.time() < t_end:
-                                    l_speed, r_speed = ir_wall_follow(
-                                        node.v.prox.horizontal)
-                                    set_speeds(node, l_speed, r_speed)
-                                    await client.sleep(0.3)
+                                # t_end = time.time() + 20
+                                # while time.time() < t_end:
+                                #     l_speed, r_speed = ir_wall_follow(
+                                #         node.v.prox.horizontal)
+                                #     set_speeds(node, l_speed, r_speed)
+                                #     await client.sleep(0.3)
                             break
 
                         # print("This is shouldturn: " + str(self.should_turn))
@@ -253,5 +263,7 @@ class ThymioController:
 
 
 if __name__ == "__main__":
-    # Instantiate the ThymioController class, which initializes and starts the robot's behavior.
-    ThymioController()
+    try:
+        ThymioController()
+    except KeyboardInterrupt:
+        pass
