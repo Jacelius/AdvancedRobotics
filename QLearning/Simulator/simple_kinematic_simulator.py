@@ -35,6 +35,12 @@ distance_to_sensor_offset = 0.08
 left_wheel_velocity = random()   # robot left wheel velocity in radians/s
 right_wheel_velocity = random()  # robot right wheel velocity in radians/s
 
+action_size = 3
+state_size = 3
+temperature = 0.2
+q_matrix = np.zeros((action_size, state_size))
+
+
 # Kinematic model
 #################
 # updates robot position and heading based on velocity of wheels and the elapsed time
@@ -111,6 +117,8 @@ def turn_angle(degrees):
     return q + np.radians(degrees)
 
 
+
+
 def turn_on_distance(distance, distance_threshold):
     global left_wheel_velocity, right_wheel_velocity, distance_to_sensor_offset
     if (distance < (distance_threshold + distance_to_sensor_offset)):
@@ -122,6 +130,26 @@ def turn_on_distance(distance, distance_threshold):
         right_wheel_velocity = 0.4
         return False
 
+
+def Q_learning(state, action):
+    global action_size, state_size, temperature, q_matrix
+    if (random.uniform(0.1) < temperature):
+        action = random.randint(0, action_size-1)
+    else:
+        action = np.argmax(q_matrix[state, :])
+    return action
+
+def update_q(state, action):
+    global q_matrix, temperature
+    q_matrix[state, action] = q_matrix[state, action] + lr * (reward(state) + temperature * np.max(q_matrix[new_state, :]) — q_matrix[state, action])
+
+def reward(state): # should return a number
+    if(state < 0.04):
+        return 0
+    elif(state > 0.06):
+        return 0
+    else: # between 0.04 and 0.06
+        return 10
 
 # Simulation loop
 #################
