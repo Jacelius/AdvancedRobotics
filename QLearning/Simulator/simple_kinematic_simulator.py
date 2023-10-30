@@ -30,6 +30,8 @@ x = 0.0   # robot position in meters - x direction - positive to the right
 y = 0.0   # robot position in meters - y direction - positive up
 q = 0.0   # robot heading with respect to x-axis in radians
 
+distance_to_sensor_offset = 0.08
+
 left_wheel_velocity = random()   # robot left wheel velocity in radians/s
 right_wheel_velocity = random()  # robot right wheel velocity in radians/s
 
@@ -109,6 +111,18 @@ def turn_angle(degrees):
     return q + np.radians(degrees)
 
 
+def turn_on_distance(distance, distance_threshold):
+    global left_wheel_velocity, right_wheel_velocity, distance_to_sensor_offset
+    if (distance < (distance_threshold + distance_to_sensor_offset)):
+        left_wheel_velocity = 0.4
+        right_wheel_velocity = -0.4
+        return True
+    else:
+        left_wheel_velocity = 0.4
+        right_wheel_velocity = 0.4
+        return False
+
+
 # Simulation loop
 #################
 file = open("trajectory.dat", "w")
@@ -116,39 +130,41 @@ file = open("trajectory.dat", "w")
 for cnt in range(num_steps):
     # simple single-ray sensor
     # a line from robot to a point outside arena in direction of q
-    # q_left = turn_angle(40)
+    q_left = turn_angle(40)
     # q_left_half = turn_angle(20)
-    # q_right = turn_angle(-40)
+    q_right = turn_angle(-40)
     # q_right_half = turn_angle(-20)
     # q_rear = turn_angle(180)
 
     qs = [q,
-          # q_left,
+          q_left,
           # q_left_half,
-          # q_right,
+          q_right,
           # q_right_half,
           # q_rear
           ]
     rays = get_line_strings(qs)
 
     for ray in rays:
-        s = world.intersection(ray)
-        distance = sqrt((s.x-x)**2+(s.y-y)**2)     # distance to wall
+        index = rays.index(ray)
 
-        # simple controller - change direction of wheels every 10 seconds (100*robot_timestep) unless close to wall then turn on spot
-        if (distance < 0.5):
-            left_wheel_velocity = -0.4
-            right_wheel_velocity = 0.4
-        else:
-            if cnt % 100 == 0:
-                left_wheel_velocity = random()
-                right_wheel_velocity = random()
+        s = world.intersection(ray)
+        distance = sqrt((s.x-x)**2+(s.y-y)**2)
+
+        if (index == 0):  # front sensor
+            if (turn_on_distance(distance, 0.05)):
+                break
+        else:  # any other sensor
+            if (turn_on_distance(distance, 0.03)):
+                break
+            # distance to wall
 
     # step simulation
     simulationstep()
 
     # check collision with arena walls
     if (world.distance(Point(x, y)) < L/2):
+        print(f"Went outside of arena :(, step: {cnt}, x: {x}, y: {y}")
         break
 
     if cnt % 50 == 0:
