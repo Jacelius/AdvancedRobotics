@@ -40,6 +40,9 @@ state_size = 3
 temperature = 0.2
 q_matrix = np.zeros((action_size, state_size))
 
+# Learning parameters
+lr = 0.1  # Learning rate
+gamma = 0.9  # Discount factor
 
 # Kinematic model
 #################
@@ -117,8 +120,6 @@ def turn_angle(degrees):
     return q + np.radians(degrees)
 
 
-
-
 def turn_on_distance(distance, distance_threshold):
     global left_wheel_velocity, right_wheel_velocity, distance_to_sensor_offset
     if (distance < (distance_threshold + distance_to_sensor_offset)):
@@ -133,23 +134,27 @@ def turn_on_distance(distance, distance_threshold):
 
 def Q_learning(state, action):
     global action_size, state_size, temperature, q_matrix
-    if (random.uniform(0.1) < temperature):
-        action = random.randint(0, action_size-1)
+    if np.random.uniform(0, 1) < temperature:
+        action = np.random.randint(0, action_size)
     else:
         action = np.argmax(q_matrix[state, :])
     return action
 
-def update_q(state, action):
-    global q_matrix, temperature
-    q_matrix[state, action] = q_matrix[state, action] + lr * (reward(state) + temperature * np.max(q_matrix[new_state, :]) — q_matrix[state, action])
 
-def reward(state): # should return a number
-    if(state < 0.04):
+def update_q(state, action, new_state, reward):
+    global q_matrix, lr, gamma
+    q_matrix[state, action] = (1 - lr) * q_matrix[state, action] + \
+        lr * (reward + gamma * np.max(q_matrix[new_state, :]))
+
+
+def reward(state):  # should return a number
+    if (state < 0.04):
         return 0
-    elif(state > 0.06):
+    elif (state > 0.06):
         return 0
-    else: # between 0.04 and 0.06
+    else:  # between 0.04 and 0.06
         return 10
+
 
 # Simulation loop
 #################
@@ -173,30 +178,51 @@ for cnt in range(num_steps):
           ]
     rays = get_line_strings(qs)
 
-    for ray in rays:
-        index = rays.index(ray)
+    # Use front sensor distance
+    state = turn_on_distance(world.distance(Point(x, y)), 0.05)
+    action = Q_learning(state, action_size)
 
-        s = world.intersection(ray)
-        distance = sqrt((s.x-x)**2+(s.y-y)**2)
+    # Take the action (update left and right wheel velocity)
+    if action == 0:
+        left_wheel_velocity = -0.4
+        right_wheel_velocity = -0.4
+    elif action == 1:
+        left_wheel_velocity = 0.0
+        right_wheel_velocity = 0.0
+    elif action == 2:
+        left_wheel_velocity = 0.4
+        right_wheel_velocity = 0.4
 
-        if (index == 0):  # front sensor
-            if (turn_on_distance(distance, 0.05)):
-                break
-        else:  # any other sensor
-            if (turn_on_distance(distance, 0.03)):
-                break
-            # distance to wall
+    # for ray in rays:
+    #     index = rays.index(ray)
+
+    #     s = world.intersection(ray)
+    #     distance = sqrt((s.x-x)**2+(s.y-y)**2)
+
+    #     if (index == 0):  # front sensor
+    #         if (turn_on_distance(distance, 0.05)):
+    #             break
+    #     else:  # any other sensor
+    #         if (turn_on_distance(distance, 0.03)):
+    #             break
+        # distance to wall
 
     # step simulation
     simulationstep()
 
-    # check collision with arena walls
-    if (world.distance(Point(x, y)) < L/2):
-        print(f"Went outside of arena :(, step: {cnt}, x: {x}, y: {y}")
+    if world.distance(Point(x, y)) < L / 2:
+        print(f"Went outside of the arena :(, step: {cnt}, x: {x}, y: {y}")
         break
+
+    # Calculate the new state and reward
+    new_state = turn_on_distance(world.distance(
+        Point(x, y)), 0.05)  # Use front sensor distance
+    reward_value = reward(new_state)
+
+    # Update the Q matrix
+    update_q(state, action, new_state, reward_value)
 
     if cnt % 50 == 0:
         write_trajectories(qs)
-
 
 file.close()
