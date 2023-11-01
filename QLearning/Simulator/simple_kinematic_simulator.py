@@ -132,12 +132,13 @@ def turn_on_distance(distance, distance_threshold):
         return False
 
 
-def Q_learning(state, action):
+def Q_learning(state):
     global action_size, state_size, temperature, q_matrix
     if np.random.uniform(0, 1) < temperature:
         action = np.random.randint(0, action_size)
     else:
         action = np.argmax(q_matrix[state, :])
+        print(action)
     return action
 
 
@@ -180,7 +181,7 @@ for cnt in range(num_steps):
 
     # Use front sensor distance
     state = turn_on_distance(world.distance(Point(x, y)), 0.05)
-    action = Q_learning(state, action_size)
+    action = Q_learning(state)
 
     # Take the action (update left and right wheel velocity)
     if action == 0:
