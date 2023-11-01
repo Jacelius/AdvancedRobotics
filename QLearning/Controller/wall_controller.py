@@ -31,7 +31,9 @@ from tdmclient import ClientAsync
 class ThymioController:
     action_size = 3
     state_size = 3
-    temperature = 0.2
+    temperature = 1
+    min_temperature = 0.1
+    cooling_rate = 0.001
     q_matrix = np.zeros((action_size, state_size))
     
     actions = [
@@ -79,7 +81,7 @@ class ThymioController:
                 action = np.random.randint(0, self.action_size)
             else:
                 action = self.q_matrix[state].argmax()
-                print(action, state)
+                print(action, state, self.temperature)
             return action
 
         def update_q(self, state, action, new_state, reward):
@@ -111,6 +113,10 @@ class ThymioController:
                             break
 
                         state = get_state(self, prox_values)
+                        if self.temperature > self.min_temperature:
+                            self.temperature -= self.cooling_rate
+
+
                         action = Q_learning(self, state)
 
                         speeds = self.actions[action]
@@ -121,6 +127,7 @@ class ThymioController:
                         node.flush()  # Send the set commands to the robot.
 
                         await client.sleep(0.1)
+                        
 
                         prox_values = node.v.prox.horizontal
                         new_state = get_state(self, prox_values)
