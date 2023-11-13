@@ -25,9 +25,11 @@ def capture_and_save_image(file_path):
         mask = cv2.inRange(hsv, blue_lower, blue_upper)
         result = cv2.bitwise_and(frame, frame, mask=mask)
 
-        # cv2.imshow('Original     Image', cv2.resize(frame, (width, height)))
-        # cv2.imshow('Blue Mask', cv2.resize(mask, (width, height)))
-        # cv2.imshow('Result', cv2.resize(result, (width, height)))
+        cv2.namedWindow('Original Image', cv2.WINDOW_NORMAL)
+
+        cv2.imshow('Original Image', cv2.resize(frame, (width, height)))
+        cv2.imshow('Blue Mask', cv2.resize(mask, (width, height)))
+        cv2.imshow('Result', cv2.resize(result, (width, height)))
 
         if cv2.waitKey(1) == ord('q'):
             break
