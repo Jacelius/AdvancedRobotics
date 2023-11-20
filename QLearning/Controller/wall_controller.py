@@ -35,22 +35,21 @@ class ThymioController:
     min_temperature = 0.1
     cooling_rate = 0.001
     q_matrix = np.zeros((action_size, state_size))
-    
+
     actions = [
-        (-300, -300), #too close
-        (300, 300), # too far
-        (0, 0) # good distance
+        (-300, -300),  # too close
+        (300, 300),  # too far
+        (0, 0)  # good distance
     ]
 
     # Learning parameters
     lr = 0.1  # Learning rate
     gamma = 0.9  # Discount factor
-    
+
     prox_max = 3000
     prox_min = 1500
 
     def __init__(self):
-        
 
         def get_state(self, prox_values):
             """
@@ -64,9 +63,6 @@ class ThymioController:
                 return 1
             else:
                 return 2
-
-        def update_q_value(self, state,action,prox_values):
-            pass
 
         def get_reward(self, state):
             if state == 0:
@@ -86,7 +82,8 @@ class ThymioController:
 
         def update_q(self, state, action, new_state, reward):
             self.q_matrix[state, action] = (1 - self.lr) * self.q_matrix[state, action] + \
-                self.lr * (reward + self.gamma * np.max(self.q_matrix[new_state, :]))
+                self.lr * (reward + self.gamma *
+                           np.max(self.q_matrix[new_state, :]))
 
         # Use the ClientAsync context manager to handle the connection to the Thymio robot.
         with ClientAsync() as client:
@@ -116,7 +113,6 @@ class ThymioController:
                         if self.temperature > self.min_temperature:
                             self.temperature -= self.cooling_rate
 
-
                         action = Q_learning(self, state)
 
                         speeds = self.actions[action]
@@ -127,7 +123,6 @@ class ThymioController:
                         node.flush()  # Send the set commands to the robot.
 
                         await client.sleep(0.1)
-                        
 
                         prox_values = node.v.prox.horizontal
                         new_state = get_state(self, prox_values)
