@@ -1,14 +1,22 @@
+"""
+RUN THIS:
+flatpak run --command=thymio-device-manager org.mobsya.ThymioSuite
+
+"""
+
 from tdmclient import ClientAsync
 import cv2
 import numpy as np
 
 # "seeker" or "avoider"
 tag_type = ""
+debug = True
 
-
-while (tag_type != "seeker" and tag_type != "avoider"):
-    tag_type = input("Do you want to be seeker or avoider? ")
-
+if not debug:
+    while (tag_type != "seeker" and tag_type != "avoider"):
+        tag_type = input("Do you want to be seeker or avoider? ")
+else:
+    tag_type = "seeker"
 
 print(tag_type)
 
@@ -46,9 +54,9 @@ onevent prox.comm
 """
 
 actions = [
-    (300, 150),  # Left detected
+    (100, 300),  # Left detected
     (300, 300),  # Middle detected
-    (150, 300)  # Right detrected
+    (300, 100),  # Right detrected
     (150, -150)  # None detected
 ]
 
@@ -61,7 +69,7 @@ states = [
 
 temperature = 1
 min_temperature = 0.1
-cooling_rate = 0.001
+cooling_rate = 0.002
 actions_size = len(actions)
 states_size = len(states)
 q_matrix = np.zeros((actions_size, states_size))
@@ -88,31 +96,54 @@ def stop_thymio(node):
 
 
 def get_blue_position(cap):
-    _, frame = cap.read()
-
+    ret, frame = cap.read()
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    cv2.imshow('frame', frame)
+    frame = cv2.flip(frame, 0)
+
+    frame[:int(0.3 * height), :] = 0
+
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    blue_lower = np.array([78, 158, 124])
+    blue_lower = np.array([78, 158, 0])
     blue_upper = np.array([138, 255, 255])
     mask = cv2.inRange(hsv, blue_lower, blue_upper)
+    result = cv2.bitwise_and(frame, frame, mask=mask)
 
-    blue_detected_pixels = np.where(mask == 255)
+    # Make non-black pixels white
+    _, result_binary = cv2.threshold(result, 1, 255, cv2.THRESH_BINARY)
+
+    # Find contours
+    contours, _ = cv2.findContours(result_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Filter contours based on minimum size
+    valid_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_size]
+
+    # Draw the filtered contours on a new binary image
+    result_filtered = np.zeros_like(result_binary)
+    cv2.drawContours(result_filtered, valid_contours, -1, (255), thickness=cv2.FILLED)
+
+
+    if debug:
+        if ret:
+            cv2.imwrite("img1.jpg", mask)
+            cv2.imwrite("img2.jpg", frame)
+
+    blue_detected_pixels = np.where(result == 255)
     if len(blue_detected_pixels[1]) > 0:
         avg_x = int(np.mean(blue_detected_pixels[1]))
 
         if avg_x < width / 3:
-            print("Blue is on the left side.")
+            print("LEFT")
             return "left"
         elif avg_x > 2 * width / 3:
-            print("Blue is on the right side.")
+            print("RIGHT")
             return "right"
 
         else:
-            print("Blue is in the middle.")
+            print("MIDDLE")
             return "middle"
-    print("Nothing detected")
+    #print("Nothing detected")
     return "none"
 
 
@@ -135,11 +166,11 @@ def get_reward(state):
     if state == 0:
         return 500
     elif state == 1:
-        return 1000
+        return 2000
     elif state == 2:
         return 500
     elif state == 3:
-        return 0
+        return -500
 
 
 def Q_learning(state):
@@ -147,7 +178,7 @@ def Q_learning(state):
         action = np.random.randint(0, actions_size)
     else:
         action = q_matrix[state].argmax()
-        print(action, state, temperature)
+        print(f"s: {state}, a: {action}, t: {temperature}")
     return action
 
 
@@ -156,66 +187,77 @@ def update_q(state, action, new_state, reward):
         lr * (reward + gamma * np.max(q_matrix[new_state, :]))
 
 
-with ClientAsync() as client:
-    async def prog():
-        # Lock the node representing the Thymio to ensure exclusive access.
-        with await client.lock() as node:
-            # Compile and send the program to the Thymio.
-            error = await node.compile(get_tag_type(tag_type))
-            if error is not None:
-                print(f"Compilation error: {error['error_msg']}")
-            else:
-                error = await node.run()
+if debug:
+    cap = cv2.VideoCapture(0)
+    get_blue_position(cap)
+else:
+    with ClientAsync() as client:
+        async def prog():
+            global temperature
+            # Lock the node representing the Thymio to ensure exclusive access.
+            with await client.lock() as node:
+                # Compile and send the program to the Thymio.
+                error = await node.compile(get_tag_type(tag_type))
                 if error is not None:
-                    print(f"Error {error['error_code']}")
+                    print(f"Compilation error: {error['error_msg']}")
+                else:
+                    error = await node.run()
+                    if error is not None:
+                        print(f"Error {error['error_code']}")
 
-            # Wait for the robot's proximity sensors to be ready.
-            await node.wait_for_variables({"prox.horizontal"})
-            print("Thymio started successfully!")
+                # Wait for the robot's proximity sensors to be ready.
+                await node.wait_for_variables({"prox.horizontal"})
+                print("Thymio started successfully!")
 
-            if tag_type == "seeker":  # seeker behavior
-                cap = cv2.VideoCapture(0)
+                if tag_type == "seeker":  # seeker behavior
+                    cap = cv2.VideoCapture(0)
 
-                if not cap.isOpened():
-                    print("Error: Couldn't open the camera.")
-                    return
+                    if not cap.isOpened():
+                        print("Error: Couldn't open the camera.")
+                        return
 
-                while True:
-                    # get the values of the proximity sensors
-                    prox_values = node.v.prox.horizontal
-                    state = get_state(get_blue_position(cap))
+                    while True:
+                        # get the values of the proximity sensors
+                        prox_values = node.v.prox.horizontal
+                        state = get_state(get_blue_position(cap))
 
-                    action = Q_learning(state)
+                        action = Q_learning(state)
 
-                    speeds = get_action(action)
+                        speeds = get_action(action)
 
-                    node.v.motor.left.target = speeds[0]
-                    node.v.motor.right.target = speeds[1]
+                        if temperature > min_temperature:
+                                print("Not under")
+                                temperature -= cooling_rate
 
-                    message = node.v.prox.comm.rx
-                    print(f"message from Thymio: {message}")
+                        node.v.motor.left.target = speeds[0]
+                        node.v.motor.right.target = speeds[1]
 
-                    if sum(prox_values) > 20000:
-                        break
+                        message = node.v.prox.comm.rx
+                        #print(f"message from Thymio: {message}")
 
-                    node.flush()  # Send the set commands to the robot.
+                        if sum(prox_values) > 20000:
+                            break
 
-                    # Pause for 0.3 seconds before the next iteration.
-                    await client.sleep(0.1)
+                        node.flush()  # Send the set commands to the robot.
 
-                    new_state = get_state(get_blue_position(cap))
-                    reward_val = get_reward(new_state)
+                        # Pause for 0.3 seconds before the next iteration.
+                        await client.sleep(0.1)
 
-                    update_q(state, action, new_state, reward_val)
+                        new_state = get_state(get_blue_position(cap))
+                        reward_val = get_reward(new_state)
 
-                    await client.sleep(0.1)
-            elif tag_type == "avoider":  # avoider behavior
-                pass
-            else:
-                print(
-                    f"Behavior not recognized because tag_type is {tag_type}")
+                        update_q(state, action, new_state, reward_val)
 
-            stop_thymio(node)
+                        await client.sleep(0.1)
 
-    # Run the asynchronous function to control the Thymio.
-    client.run_async_program(prog)
+                    cap.release()
+                elif tag_type == "avoider":  # avoider behavior
+                    pass
+                else:
+                    print(
+                        f"Behavior not recognized because tag_type is {tag_type}")
+
+                stop_thymio(node)
+
+        # Run the asynchronous function to control the Thymio.
+        client.run_async_program(prog)
