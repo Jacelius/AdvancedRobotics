@@ -112,22 +112,28 @@ def get_blue_position(cap):
 
     # Make non-black pixels white
     _, result_binary = cv2.threshold(result, 1, 255, cv2.THRESH_BINARY)
+    result_binary = cv2.cvtColor(result_binary, cv2.COLOR_BGR2GRAY)
 
     # Find contours
-    contours, _ = cv2.findContours(result_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(
+        result_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    min_contour_size = 1
 
     # Filter contours based on minimum size
-    valid_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_size]
+    valid_contours = [
+        cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_size]
 
     # Draw the filtered contours on a new binary image
     result_filtered = np.zeros_like(result_binary)
-    cv2.drawContours(result_filtered, valid_contours, -1, (255), thickness=cv2.FILLED)
-
+    cv2.drawContours(result_filtered, valid_contours, -
+                     1, (255), thickness=cv2.FILLED)
 
     if debug:
         if ret:
             cv2.imwrite("img1.jpg", mask)
             cv2.imwrite("img2.jpg", frame)
+            cv2.imwrite("result_filtered.jpg", result_filtered)
 
     blue_detected_pixels = np.where(result == 255)
     if len(blue_detected_pixels[1]) > 0:
@@ -143,7 +149,7 @@ def get_blue_position(cap):
         else:
             print("MIDDLE")
             return "middle"
-    #print("Nothing detected")
+    # print("Nothing detected")
     return "none"
 
 
@@ -226,14 +232,14 @@ else:
                         speeds = get_action(action)
 
                         if temperature > min_temperature:
-                                print("Not under")
-                                temperature -= cooling_rate
+                            print("Not under")
+                            temperature -= cooling_rate
 
                         node.v.motor.left.target = speeds[0]
                         node.v.motor.right.target = speeds[1]
 
                         message = node.v.prox.comm.rx
-                        #print(f"message from Thymio: {message}")
+                        # print(f"message from Thymio: {message}")
 
                         if sum(prox_values) > 20000:
                             break
