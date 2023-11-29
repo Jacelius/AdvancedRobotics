@@ -28,74 +28,14 @@ if not debug:
 else:
     tag_type = "seeker"
 
-while((import_matrix != True and import_matrix != False) and tag_type == "seeker"):
+while ((import_matrix != True and import_matrix != False) and tag_type == "seeker"):
     import_matrix_answer = (input("Do you want to import matrix? (y/n): "))
-    if(import_matrix_answer == "y"):
+    if (import_matrix_answer == "y"):
         import_matrix = True
-    elif(import_matrix_answer == "n"):
+    elif (import_matrix_answer == "n"):
         import_matrix = False
 
 print(tag_type)
-
-seeker_program = """
-var send_interval = 200  # time in milliseconds
-timer.period[0] = send_interval
-
-leds.top = [32, 0, 0]
-leds.bottom.left = [32, 0, 0]
-leds.bottom.right = [32, 0, 0]
-
-call prox.comm.enable(1)
-onevent timer0
-    prox.comm.tx = 1
-"""
-
-avoider_program = """
-var send_interval = 200  # time in milliseconds
-timer.period[0] = send_interval
-call prox.comm.enable(1)
-leds.top = [0, 32, 0]
-
-timer.period[0] = send_interval
-
-onevent timer0
-    prox.comm.tx = 2
-    
-onevent prox.comm
-    if prox.comm.rx == 1 then
-        leds.top = [32, 0, 32]
-        leds.bottom.left = [32, 0, 32]
-        leds.bottom.right = [32, 0, 32]
-    end
-    
-"""
-
-actions = [
-    (100, 400),  # Left detected
-    (600, 600),  # Middle detected
-    (400, 100),  # Right detrected
-    (-300, -100)  # None detected
-]
-
-states = [
-    "left",
-    "middle",
-    "right",
-    "none"
-]
-
-temperature = 0.1
-min_temperature = 0.1
-cooling_rate = 0.002
-actions_size = len(actions)
-states_size = len(states)
-q_matrix = None
-
-guiding_matrix= np.array([[500, 100,  50,   0], 
-                          [125, 500, 125,   0], 
-                          [ 50, 100, 500,   0], 
-                          [  0,   0,   0, 500]])
-
 
 if import_matrix:
     try:
@@ -106,12 +46,8 @@ if import_matrix:
 else:
     q_matrix = np.zeros((actions_size, states_size))
 
-if(tag_type == "seeker"):
+if (tag_type == "seeker"):
     print(q_matrix)
-
-lr = 0.1  # Learning rate
-gamma = 0.9  # Discount factor
-
 
 
 def stop_thymio(node):
@@ -153,17 +89,18 @@ with ClientAsync() as client:
                 while True:
                     ground_prox_values = node.v.prox.ground.reflected
                     ground_values = get_sum_values(ground_prox_values)
-                    change_colour(ground_values, node)
+                    change_colour(tag_type, ground_values, node)
                     # get the values of the proximity sensors
                     prox_values = node.v.prox.horizontal
-                    if(should_break_loop(prox_values)):
+                    if (should_break_loop(prox_values)):
                         break
 
-                    if(is_outside_arena(ground_prox_values)):
-                        while(is_outside_arena(ground_prox_values)):
+                    if (is_outside_arena(ground_prox_values)):
+                        while (is_outside_arena(ground_prox_values)):
                             await navigate_back_to_arena(node, client)
                     else:
-                        state = get_state(get_enemy_position(cap, blue_lower, blue_upper))
+                        state = get_state(get_enemy_position(
+                            cap, blue_lower, blue_upper))
 
                         action = Q_learning(state)
 
@@ -178,13 +115,13 @@ with ClientAsync() as client:
                         message = node.v.prox.comm.rx
                         # print(f"message from Thymio: {message}")
 
-                        
                         node.flush()  # Send the set commands to the robot.
 
                         # Pause for 0.3 seconds before the next iteration.
                         await client.sleep(0.2)
 
-                        new_state = get_state(get_enemy_position(cap, blue_lower, blue_upper))
+                        new_state = get_state(get_enemy_position(
+                            cap, blue_lower, blue_upper))
                         reward_val = get_reward(new_state)
 
                         update_q(state, action, new_state, reward_val)
@@ -192,7 +129,7 @@ with ClientAsync() as client:
                         await client.sleep(0.2)
 
                 cap.release()
-                if(save_Q_matrix):
+                if (save_Q_matrix):
                     print("Saving Q_matrix")
                     np.save('q_matrix.npy', q_matrix)
                     print("Saved Q_matrix")
@@ -201,17 +138,22 @@ with ClientAsync() as client:
                 red_upper = np.array([255, 255, 255])
                 while not has_been_tagged:
                     prox_values = node.v.prox.horizontal
-                    if(should_break_loop(prox_values)):
+                    if (should_break_loop(prox_values)):
                         break
 
-                    ground_values = get_sum_values(node.v.prox.ground.reflected)
+                    ground_values = get_sum_values(
+                        node.v.prox.ground.reflected)
                     if is_safe_zone(ground_values):
                         pass
 
-                    change_colour(ground_values, node)
+                    get_enemy_position(cap, red_lower, red_upper, debug=True)
 
-                    avoidBehaviour(node,get_enemy_position(cap))
-            
+                    if (debug):
+                        break
+
+                    change_colour(tag_type, ground_values, node)
+
+                    avoid_behaviour(node, get_enemy_position(cap))
 
                     await client.sleep(0.2)
             else:

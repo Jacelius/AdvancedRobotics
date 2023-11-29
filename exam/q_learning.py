@@ -1,3 +1,36 @@
+import numpy as np
+
+actions = [
+    (100, 400),  # Left detected
+    (600, 600),  # Middle detected
+    (400, 100),  # Right detrected
+    (-300, -100)  # None detected
+]
+
+states = [
+    "left",
+    "middle",
+    "right",
+    "none"
+]
+
+temperature = 0.1
+min_temperature = 0.1
+cooling_rate = 0.002
+actions_size = len(actions)
+states_size = len(states)
+q_matrix = None
+
+guiding_matrix = np.array([[500, 100,  50,   0],
+                          [125, 500, 125,   0],
+                          [50, 100, 500,   0],
+                          [0,   0,   0, 500]])
+
+
+lr = 0.1  # Learning rate
+gamma = 0.9  # Discount factor
+
+
 def get_action(action: int):
     return actions[action]
 
@@ -25,17 +58,12 @@ def get_reward(state):
 
 
 def Q_learning(state):
-    if not include_random:
+    if np.random.uniform(0, 1) < temperature:
+        action = np.random.randint(0, actions_size)
+    else:
         action = q_matrix[state].argmax()
         print(f"s: {state}, a: {action}, t: {temperature}")
-        return action
-    else:
-        if np.random.uniform(0, 1) < temperature:
-            action = np.random.randint(0, actions_size)
-        else:
-            action = q_matrix[state].argmax()
-            print(f"s: {state}, a: {action}, t: {temperature}")
-        return action
+    return action
 
 
 def update_q(state, action, new_state, reward):
