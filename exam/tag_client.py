@@ -8,6 +8,7 @@ from tdmclient import ClientAsync
 import cv2
 import numpy as np
 from helpers import *
+from q_learning import *
 
 # "seeker" or "avoider"
 tag_type = ""
@@ -139,9 +140,11 @@ with ClientAsync() as client:
             await node.wait_for_variables({"prox.horizontal"})
 
             print("Thymio started successfully!")
+            cap = cv2.VideoCapture(0)
 
             if tag_type == "seeker":  # seeker behavior
-                cap = cv2.VideoCapture(0)
+                blue_lower = np.array([78, 158, 50])
+                blue_upper = np.array([138, 255, 255])
 
                 if not cap.isOpened():
                     print("Error: Couldn't open the camera.")
@@ -160,7 +163,7 @@ with ClientAsync() as client:
                         while(is_outside_arena(ground_prox_values)):
                             await navigate_back_to_arena(node, client)
                     else:
-                        state = get_state(get_blue_position(cap))
+                        state = get_state(get_enemy_position(cap, blue_lower, blue_upper))
 
                         action = Q_learning(state)
 
@@ -181,7 +184,7 @@ with ClientAsync() as client:
                         # Pause for 0.3 seconds before the next iteration.
                         await client.sleep(0.2)
 
-                        new_state = get_state(get_blue_position(cap))
+                        new_state = get_state(get_enemy_position(cap, blue_lower, blue_upper))
                         reward_val = get_reward(new_state)
 
                         update_q(state, action, new_state, reward_val)
@@ -194,6 +197,8 @@ with ClientAsync() as client:
                     np.save('q_matrix.npy', q_matrix)
                     print("Saved Q_matrix")
             elif tag_type == "avoider":  # avoider behavior
+                red_lower = np.array([50, 100, 100])
+                red_upper = np.array([255, 255, 255])
                 while not has_been_tagged:
                     prox_values = node.v.prox.horizontal
                     if(should_break_loop(prox_values)):
@@ -204,9 +209,9 @@ with ClientAsync() as client:
                         pass
 
                     change_colour(ground_values, node)
-                    message = node.v.prox.comm.rx
-                    check_tagged(message, node)
 
+                    avoidBehaviour(node,get_enemy_position(cap))
+            
 
                     await client.sleep(0.2)
             else:

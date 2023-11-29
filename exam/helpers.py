@@ -1,3 +1,6 @@
+import numpy as np
+import cv2
+
 def is_safe_zone(values):
     print("Safe zone values", values)
     #grey value is below 400?
@@ -67,7 +70,7 @@ async def navigate_back_to_arena(node, client):
 
     await client.sleep(0.2)
 
-def get_blue_position(cap):
+def get_enemy_position(cap, lower_bound, upper_bound):
     ret, frame = cap.read()
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -78,9 +81,8 @@ def get_blue_position(cap):
     frame[:int(0.3 * height), :] = 0
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    blue_lower = np.array([78, 158, 50])
-    blue_upper = np.array([138, 255, 255])
-    mask = cv2.inRange(hsv, blue_lower, blue_upper)
+    
+    mask = cv2.inRange(hsv, lower_bound, upper_bound)
     result = cv2.bitwise_and(frame, frame, mask=mask)
 
     # Make non-black pixels white
@@ -108,9 +110,9 @@ def get_blue_position(cap):
             cv2.imwrite("img2.jpg", frame)
             cv2.imwrite("result_filtered.jpg", result_filtered)
 
-    blue_detected_pixels = np.where(result_filtered == 255)
-    if len(blue_detected_pixels[1]) > 0:
-        avg_x = int(np.mean(blue_detected_pixels[1]))
+    detected_pixels = np.where(result_filtered == 255)
+    if len(detected_pixels[1]) > 0:
+        avg_x = int(np.mean(detected_pixels[1]))
 
         if avg_x < width / 3:
             print("LEFT")
@@ -124,3 +126,19 @@ def get_blue_position(cap):
             return "middle"
     # print("Nothing detected")
     return "none"
+
+
+def avoidBehaviour(node, enemyposition):
+    if enemyposition == "left":
+        node.v.motor.left.target = 100
+        node.v.motor.right.target = -100
+    elif enemyposition == "right":
+        node.v.motor.left.target = -100
+        node.v.motor.right.target = 100
+    elif enemyposition == "middle":
+        node.v.motor.left.target = 100
+        node.v.motor.right.target = -100
+    else:
+        node.v.motor.left.target = 200
+        node.v.motor.right.target = -200
+    node.flush()
