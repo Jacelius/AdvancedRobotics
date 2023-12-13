@@ -4,7 +4,7 @@ actions = [
     (100, 400),  # Left detected
     (600, 600),  # Middle detected
     (400, 100),  # Right detrected
-    (-300, -100)  # None detected
+    (-100, 100)  # None detected
 ]
 
 states = [
@@ -19,7 +19,6 @@ min_temperature = 0.1
 cooling_rate = 0.002
 actions_size = len(actions)
 states_size = len(states)
-q_matrix = None
 
 guiding_matrix = np.array([[500, 100,  50,   0],
                           [125, 500, 125,   0],
@@ -57,8 +56,8 @@ def get_reward(state):
         return 0
 
 
-def Q_learning(state):
-    if np.random.uniform(0, 1) < temperature:
+def Q_learning(state, q_matrix, include_random=False):
+    if np.random.uniform(0, 1) < temperature and include_random:
         action = np.random.randint(0, actions_size)
     else:
         action = q_matrix[state].argmax()
@@ -66,6 +65,6 @@ def Q_learning(state):
     return action
 
 
-def update_q(state, action, new_state, reward):
+def update_q(q_matrix, state, action, new_state, reward):
     q_matrix[state, action] = (1 - lr) * q_matrix[state, action] + \
         lr * (reward + gamma * np.max(q_matrix[new_state, :]))

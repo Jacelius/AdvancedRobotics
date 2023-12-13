@@ -1,33 +1,47 @@
 import numpy as np
 import cv2
 
+wall_value = 300
+safe_zone_value = 900
+arena_value = 1400
 
 def is_safe_zone(values):
     print("Safe zone values", values)
     # grey value is below 400?
-    if values > 400:
+    if values > safe_zone_value and values < arena_value:
         print("Safe")
         return True
     else:
-        print("NOT SAFE")
+        return False
+
+def is_outside_arena(values):
+    if values < wall_value:
+        print("Outside arena")
+        return True
+    else:
         return False
 
 
 def get_sum_values(ground_reflected):
     return sum(ground_reflected)
 
+def color(node, rgb_arr):
+    node.v.leds.top = rgb_arr
+    node.v.leds.bottom.left = rgb_arr
+    node.v.leds.bottom.right = rgb_arr
+
 
 def change_colour(tag_type, ground_values, node):
     if tag_type == "seeker":
         if not is_safe_zone(ground_values):
-            node.v.leds.top = [255, 0, 0]
+            color(node, [32, 0, 0])
         else:
-            node.v.leds.top = [255, 165, 0]
+            color(node, [32, 10, 0])
     elif tag_type == "avoider":
         if not is_safe_zone(ground_values):
-            node.v.leds.top = [0, 0, 255]
+            color(node, [0, 0, 32])
         else:
-            node.v.leds.top = [0, 255, 0]
+            color(node, [0, 32, 0])
     else:
         print(f"TYPE UNKNOWN FOR: {tag_type}")
     node.flush()
@@ -52,13 +66,6 @@ def should_break_loop(prox_values):
     else:
         return False
 
-
-def is_outside_arena(ground_prox_values):
-    wall_value = 10
-    if ground_prox_values[0] < wall_value or ground_prox_values[1] < wall_value:
-        return True
-    else:
-        return False
 
 
 def get_seeker_program():
@@ -115,7 +122,7 @@ async def navigate_back_to_arena(node, client):
     await client.sleep(0.2)
 
 
-def get_enemy_position(cap, lower_bound, upper_bound, debug=False):
+def get_enemy_position(cap, lower_bound, upper_bound, contour_size=250, debug=False):
     ret, frame = cap.read()
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -138,7 +145,7 @@ def get_enemy_position(cap, lower_bound, upper_bound, debug=False):
     contours, _ = cv2.findContours(
         result_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    min_contour_size = 250
+    min_contour_size = contour_size
 
     # Filter contours based on minimum size
     valid_contours = [
@@ -175,14 +182,14 @@ def get_enemy_position(cap, lower_bound, upper_bound, debug=False):
 
 def avoid_behaviour(node, enemyposition):
     if enemyposition == "left":
-        node.v.motor.left.target = 100
+        node.v.motor.left.target = -400
         node.v.motor.right.target = -100
     elif enemyposition == "right":
         node.v.motor.left.target = -100
-        node.v.motor.right.target = 100
+        node.v.motor.right.target = -400
     elif enemyposition == "middle":
-        node.v.motor.left.target = 100
-        node.v.motor.right.target = -100
+        node.v.motor.left.target = -400
+        node.v.motor.right.target = -400
     else:
         node.v.motor.left.target = 200
         node.v.motor.right.target = -200
