@@ -61,7 +61,7 @@ def stop_thymio(node):
 
 with ClientAsync() as client:
     async def prog():
-        global temperature, test_ir_sensor
+        global temperature, test_ir_sensor, has_been_tagged
         # Lock the node representing the Thymio to ensure exclusive access.
         with await client.lock() as node:
             # Compile and send the program to the Thymio.
@@ -89,8 +89,8 @@ with ClientAsync() as client:
             cap = cv2.VideoCapture(0)
 
             if tag_type == "seeker":  # seeker behavior
-                blue_lower = np.array([78, 128, 50])
-                blue_upper = np.array([138, 255, 255])
+                blue_lower = np.array([90, 50, 50]) 
+                blue_upper = np.array([128, 238, 255])
 
                 if not cap.isOpened():
                     print("Error: Couldn't open the camera.")
@@ -110,43 +110,43 @@ with ClientAsync() as client:
                     if (should_break_loop(prox_values)):
                         break
 
-                    if (is_outside_arena(ground_values)):
-                        while (is_outside_arena(ground_values)):
-                            await navigate_back_to_arena(node, client)
-                            ground_prox_values = node.v.prox.ground.reflected
-                            ground_values = get_sum_values(ground_prox_values)
-                    else:
-                        if(debug):
-                            get_enemy_position(cap, blue_lower, blue_upper, contour_size=20, debug=debug)
-                            break
-                        state = get_state(get_enemy_position(
-                            cap, blue_lower, blue_upper))
+                    # if (is_outside_arena(ground_values)):
+                    #     while (is_outside_arena(ground_values)):
+                    #         await navigate_back_to_arena(node, client)
+                    #         ground_prox_values = node.v.prox.ground.reflected
+                    #         ground_values = get_sum_values(ground_prox_values)
+                    # else:
+                    if(debug):
+                        get_enemy_position(cap, blue_lower, blue_upper, contour_size=20, debug=debug)
+                        break
+                    state = get_state(get_enemy_position(
+                        cap, blue_lower, blue_upper))
 
-                        action = Q_learning(state, q_matrix)
+                    action = Q_learning(state, q_matrix)
 
-                        speeds = get_action(action)
+                    speeds = get_action(action)
 
-                        if temperature > min_temperature:
-                            temperature -= cooling_rate
+                    if temperature > min_temperature:
+                        temperature -= cooling_rate
 
-                        node.v.motor.left.target = speeds[0]
-                        node.v.motor.right.target = speeds[1]
+                    node.v.motor.left.target = speeds[0]
+                    node.v.motor.right.target = speeds[1]
 
-                        message = node.v.prox.comm.rx
-                        # print(f"message from Thymio: {message}")
+                    message = node.v.prox.comm.rx
+                    # print(f"message from Thymio: {message}")
 
-                        node.flush()  # Send the set commands to the robot.
+                    node.flush()  # Send the set commands to the robot.
 
-                        # Pause for 0.3 seconds before the next iteration.
-                        await client.sleep(0.15)
+                    # Pause for 0.3 seconds before the next iteration.
+                    await client.sleep(0.1)
 
-                        new_state = get_state(get_enemy_position(
-                            cap, blue_lower, blue_upper))
-                        reward_val = get_reward(new_state)
+                    new_state = get_state(get_enemy_position(
+                        cap, blue_lower, blue_upper))
+                    reward_val = get_reward(new_state)
 
-                        update_q(q_matrix, state, action, new_state, reward_val)
+                    update_q(q_matrix, state, action, new_state, reward_val)
 
-                        await client.sleep(0.15)
+                    await client.sleep(0.1)
 
                 cap.release()
                 if (save_Q_matrix):
@@ -161,13 +161,25 @@ with ClientAsync() as client:
                     print(f"message from Thymio: {message}")
                     await client.sleep(0.2)
 
+                
+
                 while not has_been_tagged:
+                    if(debug):
+                        get_enemy_position(cap, red_lower, red_upper, contour_size=20, debug=debug)
+                        break
                     prox_values = node.v.prox.horizontal
                     if (should_break_loop(prox_values)):
                         break
 
+                    message = node.v.prox.comm.rx
+                    print(f"Message: {message}")
+                    has_been_tagged = check_tagged(message, node)
+                    if has_been_tagged:
+                        break
+
                     ground_values = get_sum_values(
                         node.v.prox.ground.reflected)
+
                     if is_safe_zone(ground_values):
                         node.v.motor.left.target = 0
                         node.v.motor.right.target = 0
@@ -176,7 +188,19 @@ with ClientAsync() as client:
 
                         if (debug):
                             break
-
+                    elif is_outside_arena(ground_values):
+                        node.v.motor.left.target = 200
+                        node.v.motor.right.target = 200
+                        node.flush()
+                        await client.sleep(0.2)
+                        node.v.motor.left.target = 200
+                        node.v.motor.right.target = -200
+                        node.flush()
+                        await client.sleep(0.3)
+                        node.v.motor.left.target = 500
+                        node.v.motor.right.target = 500
+                        node.flush()
+                        await client.sleep(0.5)
                     else:
 
                         get_enemy_position(cap, red_lower, red_upper, contour_size=50, debug=debug)
@@ -193,11 +217,10 @@ with ClientAsync() as client:
                 print(
                     f"Behavior not recognized because tag_type is {tag_type}")
 
-            #stop_thymio(node)
+        node.v.motor.left.target = 0
+        node.v.motor.right.target = 0
+        node.flush()
+        print("Stopped thymio")
 
     # Run the asynchronous function to control the Thymio.
-    cap = cv2.VideoCapture(0)
-    blue_lower = np.array([78, 128, 50])
-    blue_upper = np.array([138, 255, 255])
-    get_enemy_position(cap, blue_lower, blue_upper, contour_size=10, debug=debug)
-    #client.run_async_program(prog)
+    client.run_async_program(prog)

@@ -48,13 +48,13 @@ def change_colour(tag_type, ground_values, node):
 
 
 def check_tagged(message, node):
-    if message == 1:  # ladies and gentlemen, we have been tagged :(
-        has_been_tagged = True
-        node.v.leds.top = [0, 0, 255]  # set to purple
+    if message == "1":  # ladies and gentlemen, we have been tagged :(
+        # node.v.leds.top = [0, 0, 32]  # set to purple MISSING
         node.v.motor.left.target = 0
         node.v.motor.right.target = 0
         node.flush()
-    elif message == 2:
+        return True
+    elif message == "2":
         pass
         # now we have to leave the orange zone
         # and disable transmission of "2" for 5 seconds
@@ -155,6 +155,9 @@ def get_enemy_position(cap, lower_bound, upper_bound, contour_size=250, debug=Fa
     result_filtered = np.zeros_like(result_binary)
     cv2.drawContours(result_filtered, valid_contours, -
                      1, (255), thickness=cv2.FILLED)
+
+    # cv2.imwrite("live.jpg", frame)
+    # cv2.imwrite("live_filtered.jpg", result_filtered)
 
     if debug:
         if ret:
